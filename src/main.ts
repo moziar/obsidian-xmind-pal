@@ -33,7 +33,7 @@ interface FileCacheEntry {
 export default class XMindViewerPlugin extends Plugin {
 	settings: XMindViewerSettings;
 	private fileCache: Map<string, FileCacheEntry> = new Map();
-	private preloadTimer: number | null = null;
+	private preloadHandle: number | null = null;
 	private preloadIframe: HTMLIFrameElement | null = null;
 
 	async onload() {
@@ -105,16 +105,26 @@ export default class XMindViewerPlugin extends Plugin {
 	}
 
 	/**
-	 * Schedule a delayed preload of the XMind embed-viewer page.
-	 * Delayed so it doesn't compete with Obsidian's own startup work.
+	 * Schedule a preload of the XMind embed-viewer page during an idle slot,
+	 * so it doesn't compete with Obsidian's own startup work. Falls back to a
+	 * 2s timeout in case no idle slot arrives (e.g. busy vault on launch).
 	 */
 	schedulePreloadViewer(): void {
 		this.clearPreload();
-		// 2s delay lets Obsidian finish its startup paint first
-		this.preloadTimer = window.setTimeout(() => {
-			this.preloadTimer = null;
+		const run = () => {
+			this.preloadHandle = null;
 			this.preloadViewer();
-		}, 2000);
+		};
+		// requestIdleCallback may never fire if the main thread stays busy;
+		// the timeout ensures we eventually preload.
+		const ric = (window as any).requestIdleCallback as
+			| ((cb: () => void, opts?: { timeout: number }) => number)
+			| undefined;
+		if (ric) {
+			this.preloadHandle = ric(run, { timeout: 2000 });
+		} else {
+			this.preloadHandle = window.setTimeout(run, 2000) as unknown as number;
+		}
 	}
 
 	/**
@@ -136,9 +146,16 @@ export default class XMindViewerPlugin extends Plugin {
 	}
 
 	clearPreload(): void {
-		if (this.preloadTimer !== null) {
-			window.clearTimeout(this.preloadTimer);
-			this.preloadTimer = null;
+		if (this.preloadHandle !== null) {
+			const cic = (window as any).cancelIdleCallback as
+				| ((handle: number) => void)
+				| undefined;
+			if (cic) {
+				cic(this.preloadHandle);
+			} else {
+				window.clearTimeout(this.preloadHandle);
+			}
+			this.preloadHandle = null;
 		}
 		if (this.preloadIframe) {
 			this.preloadIframe.remove();
