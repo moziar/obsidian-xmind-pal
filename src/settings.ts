@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import XMindViewerPlugin from './main';
+import { t } from './i18n';
 
 export class XMindViewerSettingTab extends PluginSettingTab {
 	plugin: XMindViewerPlugin;
@@ -14,10 +15,25 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Default property')
-			.setDesc('Name of the frontmatter property that contains the xmind file link.')
+			.setName(t('settings.language.name'))
+			.setDesc(t('settings.language.desc'))
+			.addDropdown(dropdown => dropdown
+				.addOption('auto', t('settings.language.auto'))
+				.addOption('zh', t('settings.language.zh'))
+				.addOption('en', t('settings.language.en'))
+				.setValue(this.plugin.settings.language)
+				.onChange(async (value) => {
+					this.plugin.settings.language = value as 'auto' | 'en' | 'zh';
+					await this.plugin.saveSettings();
+					this.plugin.applyLocale();
+					this.display();
+				}));
+
+		new Setting(containerEl)
+			.setName(t('settings.defaultProperty.name'))
+			.setDesc(t('settings.defaultProperty.desc'))
 			.addText(text => text
-				.setPlaceholder('xmind')
+				.setPlaceholder(t('settings.defaultProperty.placeholder'))
 				.setValue(this.plugin.settings.defaultProperty)
 				.onChange(async (value) => {
 					this.plugin.settings.defaultProperty = value;
@@ -25,11 +41,11 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Render mode')
-			.setDesc('Online uses XMind embed service (requires network). Offline parses and renders locally (no network, simpler visual style).')
+			.setName(t('settings.renderMode.name'))
+			.setDesc(t('settings.renderMode.desc'))
 			.addDropdown(dropdown => dropdown
-				.addOption('online', 'Online (XMind embed service)')
-				.addOption('offline', 'Offline (local renderer)')
+				.addOption('online', t('settings.renderMode.online'))
+				.addOption('offline', t('settings.renderMode.offline'))
 				.setValue(this.plugin.settings.renderMode)
 				.onChange(async (value) => {
 					this.plugin.settings.renderMode = value as 'online' | 'offline';
@@ -39,11 +55,11 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 
 		if (this.plugin.settings.renderMode === 'online') {
 			new Setting(containerEl)
-				.setName('Region')
-				.setDesc('XMind embed service region. Use "cn" for faster loading in mainland China.')
+				.setName(t('settings.region.name'))
+				.setDesc(t('settings.region.desc'))
 				.addDropdown(dropdown => dropdown
-					.addOption('global', 'Global (xmind.app)')
-					.addOption('cn', 'China (xmind.cn)')
+					.addOption('global', t('settings.region.global'))
+					.addOption('cn', t('settings.region.cn'))
 					.setValue(this.plugin.settings.region)
 					.onChange(async (value) => {
 						this.plugin.settings.region = value as 'global' | 'cn';
@@ -52,10 +68,10 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 		}
 
 		new Setting(containerEl)
-			.setName('Viewer height')
-			.setDesc('CSS height for the embedded viewer.')
+			.setName(t('settings.viewerHeight.name'))
+			.setDesc(t('settings.viewerHeight.desc'))
 			.addText(text => text
-				.setPlaceholder('500px')
+				.setPlaceholder(t('settings.viewerHeight.placeholder'))
 				.setValue(this.plugin.settings.viewerHeight)
 				.onChange(async (value) => {
 					this.plugin.settings.viewerHeight = value;
@@ -63,8 +79,8 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Show toolbar')
-			.setDesc('Display a toolbar above the viewer with the file name and an open-externally button.')
+			.setName(t('settings.showToolbar.name'))
+			.setDesc(t('settings.showToolbar.desc'))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.showToolbar)
 				.onChange(async (value) => {
@@ -75,8 +91,8 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 
 		if (this.plugin.settings.showToolbar) {
 			new Setting(containerEl)
-				.setName('Double-click to open')
-				.setDesc('Double-click the toolbar area to open the xmind file with the default application.')
+				.setName(t('settings.doubleClickOpen.name'))
+				.setDesc(t('settings.doubleClickOpen.desc'))
 				.addToggle(toggle => toggle
 					.setValue(this.plugin.settings.doubleClickOpen)
 					.onChange(async (value) => {

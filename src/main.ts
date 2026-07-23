@@ -1,6 +1,7 @@
-import { Plugin, TFile } from 'obsidian';
+import { Plugin, TFile, moment } from 'obsidian';
 import { XMindViewerSettingTab } from './settings';
 import { registerXMindCodeBlock } from './xmind-codeblock';
+import { setLocale, t } from './i18n';
 
 export interface XMindViewerSettings {
 	defaultProperty: string;
@@ -9,6 +10,7 @@ export interface XMindViewerSettings {
 	viewerHeight: string;
 	showToolbar: boolean;
 	doubleClickOpen: boolean;
+	language: 'auto' | 'en' | 'zh';
 }
 
 export const DEFAULT_SETTINGS: XMindViewerSettings = {
@@ -18,6 +20,7 @@ export const DEFAULT_SETTINGS: XMindViewerSettings = {
 	viewerHeight: '500px',
 	showToolbar: true,
 	doubleClickOpen: true,
+	language: 'auto',
 };
 
 interface FileCacheEntry {
@@ -32,13 +35,15 @@ export default class XMindViewerPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
+		this.applyLocale();
+
 		this.addSettingTab(new XMindViewerSettingTab(this.app, this));
 
 		registerXMindCodeBlock(this);
 
 		this.addCommand({
 			id: 'insert-xmind-codeblock',
-			name: 'Insert XMind viewer code block',
+			name: t('command.insertCodeblock'),
 			editorCallback: (editor) => {
 				editor.replaceSelection('```xmind\n```');
 			},
@@ -72,6 +77,20 @@ export default class XMindViewerPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	/**
+	 * Apply the configured language to the i18n module.
+	 * 'auto' follows Obsidian's locale (via moment.locale()), otherwise the
+	 * explicitly selected language is used.
+	 */
+	applyLocale(): void {
+		const lang = this.settings.language;
+		if (lang === 'auto') {
+			setLocale(moment.locale());
+		} else {
+			setLocale(lang);
+		}
 	}
 
 	async readXmindFile(file: TFile): Promise<ArrayBuffer> {

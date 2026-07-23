@@ -1,5 +1,6 @@
 import { unzipSync, strFromU8 } from 'fflate';
 import { XMindViewerSettings } from './main';
+import { t } from './i18n';
 
 interface XMindTopic {
 	id: string;
@@ -183,7 +184,7 @@ export function renderOffline(
 	} catch (e) {
 		const errorEl = document.createElement('div');
 		errorEl.className = 'xmind-viewer-error';
-		errorEl.textContent = `Failed to parse xmind file: ${e instanceof Error ? e.message : String(e)}`;
+		errorEl.textContent = t('error.parseFailed', { message: e instanceof Error ? e.message : String(e) });
 		el.appendChild(errorEl);
 		return () => el.empty();
 	}
@@ -191,7 +192,7 @@ export function renderOffline(
 	if (sheets.length === 0) {
 		const errorEl = document.createElement('div');
 		errorEl.className = 'xmind-viewer-error';
-		errorEl.textContent = 'No sheets found in xmind file';
+		errorEl.textContent = t('error.noSheets');
 		el.appendChild(errorEl);
 		return () => el.empty();
 	}
@@ -227,7 +228,7 @@ export function renderOffline(
 		const tab = document.createElement('div');
 		tab.className = 'xmind-viewer-tab';
 		if (index === 0) tab.addClass('is-active');
-		tab.textContent = sheet.title || `Sheet ${index + 1}`;
+		tab.textContent = sheet.title || t('ui.sheetLabel', { index: index + 1 });
 		tab.addEventListener('click', () => showSheet(index));
 		tabBar.appendChild(tab);
 	});

@@ -2,6 +2,7 @@ import { MarkdownPostProcessorContext, MarkdownRenderChild, TFile, setIcon } fro
 import XMindViewerPlugin from './main';
 import { renderOnline } from './xmind-online';
 import { renderOffline } from './xmind-offline';
+import { t } from './i18n';
 
 export function registerXMindCodeBlock(plugin: XMindViewerPlugin): void {
 	plugin.registerMarkdownCodeBlockProcessor('xmind', async (source, el, ctx) => {
@@ -19,7 +20,7 @@ export function registerXMindCodeBlock(plugin: XMindViewerPlugin): void {
 				cleanup = fn;
 			});
 		} catch (e) {
-			showError(container, `Failed to render: ${e instanceof Error ? e.message : String(e)}`);
+			showError(container, t('error.renderFailed', { message: e instanceof Error ? e.message : String(e) }));
 		}
 	});
 }
@@ -58,12 +59,12 @@ async function processXMindBlock(
 
 	if (!fileLink) {
 		if (content === '') {
-			showError(container, `Property '${plugin.settings.defaultProperty}' not found or empty in this note.`);
+			showError(container, t('error.propertyNotFound', { name: plugin.settings.defaultProperty }));
 		} else if (content.startsWith('property:')) {
 			const propertyName = content.slice('property:'.length).trim();
-			showError(container, `Property '${propertyName}' not found or empty in this note.`);
+			showError(container, t('error.propertyNotFound', { name: propertyName }));
 		} else {
-			showError(container, `Could not resolve xmind file from: ${content}`);
+			showError(container, t('error.couldNotResolve', { content }));
 		}
 		return;
 	}
@@ -71,12 +72,12 @@ async function processXMindBlock(
 	// Resolve the file
 	const file = plugin.app.metadataCache.getFirstLinkpathDest(fileLink, sourcePath);
 	if (!file) {
-		showError(container, `Xmind file '${fileLink}' not found.`);
+		showError(container, t('error.fileNotFound', { name: fileLink }));
 		return;
 	}
 
 	if (file.extension !== 'xmind') {
-		showError(container, `File '${file.name}' is not a .xmind file.`);
+		showError(container, t('error.notXmindFile', { name: file.name }));
 		return;
 	}
 
@@ -156,7 +157,7 @@ function createToolbar(
 	filenameEl.title = file.path;
 
 	const openBtn = toolbar.createDiv({ cls: 'xmind-viewer-open-btn' });
-	openBtn.title = 'Open with default app';
+	openBtn.title = t('ui.openWithDefaultApp');
 	setIcon(openBtn, 'external-link');
 	openBtn.addEventListener('click', () => {
 		openWithDefaultApp(plugin, file);
@@ -191,7 +192,7 @@ function createLoadingPlaceholder(): HTMLElement {
 
 	const text = document.createElement('div');
 	text.className = 'xmind-viewer-loading-text';
-	text.textContent = 'Loading mind map...';
+	text.textContent = t('ui.loadingMindMap');
 	el.appendChild(text);
 
 	return el;
