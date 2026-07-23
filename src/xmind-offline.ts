@@ -1,4 +1,4 @@
-import { unzipSync, strFromU8 } from 'fflate';
+import { unzip, strFromU8, Unzipped } from 'fflate';
 import { XMindViewerSettings } from './main';
 import { t } from './i18n';
 
@@ -30,15 +30,24 @@ const LEVEL_WIDTH = 220;
 const H_PADDING = 16;
 const SVG_PADDING = 20;
 
-function parseXmindFile(fileData: ArrayBuffer): XMindSheet[] {
+function parseXmindFile(fileData: ArrayBuffer): Promise<XMindSheet[]> {
 	const compressed = new Uint8Array(fileData);
-	const files = unzipSync(compressed);
-	const contentBytes = files['content.json'];
-	if (!contentBytes) {
-		throw new Error('content.json not found in xmind file');
-	}
-	const contentJson = strFromU8(contentBytes);
-	return JSON.parse(contentJson);
+	return new Promise<Unzipped>((resolve, reject) => {
+		unzip(compressed, (err, files) => {
+			if (err || !files) {
+				reject(err ?? new Error('unzip failed'));
+				return;
+			}
+			resolve(files);
+		});
+	}).then(files => {
+		const contentBytes = files['content.json'];
+		if (!contentBytes) {
+			throw new Error('content.json not found in xmind file');
+		}
+		const contentJson = strFromU8(contentBytes);
+		return JSON.parse(contentJson) as XMindSheet[];
+	});
 }
 
 function buildTree(topic: XMindTopic, depth: number = 0): TreeNode {
@@ -174,25 +183,28 @@ function renderSheetSVG(sheet: XMindSheet): HTMLElement {
 export function renderOffline(
 	el: HTMLElement,
 	fileData: ArrayBuffer,
-	settings: XMindViewerSettings
-): () => void {
-	let sheets: XMindSheet[];
-	try {
-		sheets = parseXmindFile(fileData);
-	} catch (e) {
+	settings: XMindViewerSettings,
+	onCleanup: (fn: () => void) => void
+): void {
+	parseXmindFile(fileData).then(sheets => {
+		renderSheets(el, sheets, settings);
+		onCleanup(() => el.empty());
+	}).catch(e => {
 		const errorEl = document.createElement('div');
 		errorEl.className = 'xmind-viewer-error';
 		errorEl.textContent = t('error.parseFailed', { message: e instanceof Error ? e.message : String(e) });
 		el.appendChild(errorEl);
-		return () => el.empty();
-	}
+		onCleanup(() => el.empty());
+	});
+}
 
+function renderSheets(el: HTMLElement, sheets: XMindSheet[], settings: XMindViewerSettings): void {
 	if (sheets.length === 0) {
 		const errorEl = document.createElement('div');
 		errorEl.className = 'xmind-viewer-error';
 		errorEl.textContent = t('error.noSheets');
 		el.appendChild(errorEl);
-		return () => el.empty();
+		return;
 	}
 
 	// Single sheet — render directly
@@ -200,7 +212,7 @@ export function renderOffline(
 		const sheetEl = renderSheetSVG(sheets[0]);
 		sheetEl.style.height = settings.viewerHeight;
 		el.appendChild(sheetEl);
-		return () => el.empty();
+		return;
 	}
 
 	// Multiple sheets — render tab bar
@@ -236,6 +248,4 @@ export function renderOffline(
 	el.appendChild(wrapper);
 
 	showSheet(0);
-
-	return () => el.empty();
 }

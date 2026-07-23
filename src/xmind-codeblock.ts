@@ -102,8 +102,16 @@ async function processXMindBlock(
 		wrapper.appendChild(loadingEl);
 		setCleanup(renderOnline(wrapper, fileData, plugin.settings, loadingEl));
 	} else {
-		// Offline mode: render immediately (local parsing is fast)
-		setCleanup(renderOffline(viewerEl, fileData, plugin.settings));
+		// Offline mode: show loading placeholder while parsing asynchronously
+		const loadingEl = createLoadingPlaceholder();
+		loadingEl.style.position = 'relative';
+		loadingEl.style.height = plugin.settings.viewerHeight;
+		viewerEl.appendChild(loadingEl);
+
+		renderOffline(viewerEl, fileData, plugin.settings, (cleanupFn) => {
+			loadingEl.remove();
+			setCleanup(cleanupFn);
+		});
 	}
 }
 
