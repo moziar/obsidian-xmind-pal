@@ -12,6 +12,7 @@ export function registerXMindCodeBlock(plugin: XMindViewerPlugin): void {
 		let cleanup: (() => void) | undefined;
 		child.onunload = () => {
 			cleanup?.();
+			cleanup = undefined;
 		};
 		ctx.addChild(child);
 

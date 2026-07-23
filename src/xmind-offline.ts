@@ -22,7 +22,6 @@ interface TreeNode {
 	x: number;
 	y: number;
 	width: number;
-	height: number;
 }
 
 const NODE_HEIGHT = 28;
@@ -50,7 +49,6 @@ function buildTree(topic: XMindTopic, depth: number = 0): TreeNode {
 		x: 0,
 		y: 0,
 		width: 0,
-		height: NODE_HEIGHT,
 		children: attached.map(c => buildTree(c, depth + 1)),
 	};
 }
