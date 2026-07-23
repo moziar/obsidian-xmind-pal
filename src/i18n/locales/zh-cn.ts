@@ -20,6 +20,9 @@ export default {
 	'settings.region.global': '全球 (xmind.app)',
 	'settings.region.cn': '中国 (xmind.cn)',
 
+	'settings.preloadViewer.name': '启动时预加载查看器',
+	'settings.preloadViewer.desc': '在启动时后台加载 XMind 嵌入页面，让首次预览打开更快。仅在线模式下有效。',
+
 	'settings.viewerHeight.name': '查看器高度',
 	'settings.viewerHeight.desc': '嵌入查看器的 CSS 高度。',
 	'settings.viewerHeight.placeholder': '500px',

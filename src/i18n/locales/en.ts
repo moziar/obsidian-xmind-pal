@@ -20,6 +20,9 @@ export default {
 	'settings.region.global': 'Global (xmind.app)',
 	'settings.region.cn': 'China (xmind.cn)',
 
+	'settings.preloadViewer.name': 'Preload viewer on startup',
+	'settings.preloadViewer.desc': 'Load the XMind embed page in the background at startup so the first preview opens faster. Only effective in online mode.',
+
 	'settings.viewerHeight.name': 'Viewer height',
 	'settings.viewerHeight.desc': 'CSS height for the embedded viewer.',
 	'settings.viewerHeight.placeholder': '500px',

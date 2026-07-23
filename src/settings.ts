@@ -64,6 +64,25 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.region = value as 'global' | 'cn';
 						await this.plugin.saveSettings();
+						// Region changes the iframe URL — re-preload if enabled
+						if (this.plugin.settings.preloadViewer) {
+							this.plugin.schedulePreloadViewer();
+						}
+					}));
+
+			new Setting(containerEl)
+				.setName(t('settings.preloadViewer.name'))
+				.setDesc(t('settings.preloadViewer.desc'))
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.preloadViewer)
+					.onChange(async (value) => {
+						this.plugin.settings.preloadViewer = value;
+						await this.plugin.saveSettings();
+						if (value) {
+							this.plugin.schedulePreloadViewer();
+						} else {
+							this.plugin.clearPreload();
+						}
 					}));
 		}
 

@@ -11,6 +11,7 @@ export interface XMindViewerSettings {
 	showToolbar: boolean;
 	doubleClickOpen: boolean;
 	language: 'auto' | 'en' | 'zh';
+	preloadViewer: boolean;
 }
 
 export const DEFAULT_SETTINGS: XMindViewerSettings = {
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS: XMindViewerSettings = {
 	showToolbar: true,
 	doubleClickOpen: true,
 	language: 'auto',
+	preloadViewer: true,
 };
 
 interface FileCacheEntry {
@@ -31,6 +33,8 @@ interface FileCacheEntry {
 export default class XMindViewerPlugin extends Plugin {
 	settings: XMindViewerSettings;
 	private fileCache: Map<string, FileCacheEntry> = new Map();
+	private preloadTimer: number | null = null;
+	private preloadIframe: HTMLIFrameElement | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -51,6 +55,13 @@ export default class XMindViewerPlugin extends Plugin {
 
 		// Warm up DNS/TLS connection to XMind embed service for faster iframe loading
 		injectPreconnect(this.settings.region);
+
+		// Preload the XMind embed-viewer page so browser caches its JS/HTML/CSS.
+		// First-view latency is dominated by iframe resource download; this brings
+		// every subsequent file close to "already loaded" speed.
+		if (this.settings.preloadViewer && this.settings.renderMode === 'online') {
+			this.schedulePreloadViewer();
+		}
 
 		// Invalidate file cache when xmind files change
 		this.registerEvent(this.app.vault.on('modify', (file) => {
@@ -91,6 +102,52 @@ export default class XMindViewerPlugin extends Plugin {
 		} else {
 			setLocale(lang);
 		}
+	}
+
+	/**
+	 * Schedule a delayed preload of the XMind embed-viewer page.
+	 * Delayed so it doesn't compete with Obsidian's own startup work.
+	 */
+	schedulePreloadViewer(): void {
+		this.clearPreload();
+		// 2s delay lets Obsidian finish its startup paint first
+		this.preloadTimer = window.setTimeout(() => {
+			this.preloadTimer = null;
+			this.preloadViewer();
+		}, 2000);
+	}
+
+	/**
+	 * Create a hidden iframe pointing at the XMind embed-viewer page for the
+	 * current region. The iframe loads no file — its only purpose is to make
+	 * the browser download and cache the page's JS/HTML/CSS so that the first
+	 * real viewer instance is fast.
+	 */
+	private preloadViewer(): void {
+		if (this.preloadIframe) return;
+		const domain = this.settings.region === 'cn' ? 'https://www.xmind.cn' : 'https://www.xmind.app';
+		const iframe = document.createElement('iframe');
+		iframe.style.display = 'none';
+		iframe.setAttribute('aria-hidden', 'true');
+		iframe.setAttribute('tabindex', '-1');
+		iframe.src = `${domain}/embed-viewer`;
+		document.body.appendChild(iframe);
+		this.preloadIframe = iframe;
+	}
+
+	clearPreload(): void {
+		if (this.preloadTimer !== null) {
+			window.clearTimeout(this.preloadTimer);
+			this.preloadTimer = null;
+		}
+		if (this.preloadIframe) {
+			this.preloadIframe.remove();
+			this.preloadIframe = null;
+		}
+	}
+
+	onunload(): void {
+		this.clearPreload();
 	}
 
 	async readXmindFile(file: TFile): Promise<ArrayBuffer> {
