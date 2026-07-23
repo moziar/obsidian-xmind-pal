@@ -1,0 +1,29 @@
+{
+	"name": "obsidian-xmind-pal",
+	"version": "0.1.0",
+	"description": "Embed and preview .xmind mind map files in your notes.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+	},
+	"keywords": [
+		"obsidian",
+		"xmind",
+		"mindmap",
+		"viewer"
+	],
+	"author": "Moz",
+	"license": "MIT",
+	"dependencies": {
+		"fflate": "^0.8.2",
+		"xmind-embed-viewer": "^1.2.0"
+	},
+	"devDependencies": {
+		"@types/node": "^16.11.6",
+		"esbuild": "0.17.3",
+		"obsidian": "latest",
+		"tslib": "2.4.0",
+		"typescript": "^5.0.0"
+	}
+}
