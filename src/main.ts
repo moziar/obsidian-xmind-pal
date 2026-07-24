@@ -60,7 +60,15 @@ export default class XMindViewerPlugin extends Plugin {
 		// First-view latency is dominated by iframe resource download; this brings
 		// every subsequent file close to "already loaded" speed.
 		if (this.settings.preloadViewer && this.settings.renderMode === 'online') {
-			this.schedulePreloadViewer();
+			// If Obsidian has finished starting up (e.g. plugin enabled manually
+			// from settings after launch), preload immediately — idle scheduling
+			// may be delayed by background work and leave the first preview blank.
+			// During startup, defer to an idle slot to avoid competing for resources.
+			if (this.app.workspace.layoutReady) {
+				this.preloadViewer();
+			} else {
+				this.schedulePreloadViewer();
+			}
 		}
 
 		// Invalidate file cache when xmind files change
