@@ -11,9 +11,9 @@ export default {
 	'settings.defaultProperty.placeholder': 'xmind',
 
 	'settings.renderMode.name': '渲染模式',
-	'settings.renderMode.desc': '在线模式使用 XMind 嵌入服务（需要网络）。离线模式本地解析渲染（无需网络，样式更简单）。',
+	'settings.renderMode.desc': '缩略图模式显示 XMind 生成的预览图（最快、原生效果）。在线模式使用 XMind 嵌入服务（需要网络）。',
+	'settings.renderMode.thumbnail': '缩略图（XMind 预览图）',
 	'settings.renderMode.online': '在线（XMind 嵌入服务）',
-	'settings.renderMode.offline': '离线（本地渲染）',
 
 	'settings.region.name': '区域',
 	'settings.region.desc': 'XMind 嵌入服务区域。在中国大陆使用 "cn" 可加快加载速度。',
@@ -43,10 +43,10 @@ export default {
 	'error.fileNotFound': "未找到 xmind 文件 '{name}'。",
 	'error.notXmindFile': "文件 '{name}' 不是 .xmind 文件。",
 	'error.parseFailed': '解析 xmind 文件失败：{message}',
-	'error.noSheets': 'xmind 文件中未找到任何工作表',
+	'error.thumbnailFailed': '加载缩略图失败：{message}',
 
 	// UI
 	'ui.openWithDefaultApp': '使用默认应用打开',
 	'ui.loadingMindMap': '正在加载思维导图...',
-	'ui.sheetLabel': '工作表 {index}',
+	'ui.mindMapThumbnail': '思维导图缩略图',
 };

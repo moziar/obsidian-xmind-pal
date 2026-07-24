@@ -5,7 +5,7 @@ import { setLocale, t } from './i18n';
 
 export interface XMindViewerSettings {
 	defaultProperty: string;
-	renderMode: 'online' | 'offline';
+	renderMode: 'online' | 'thumbnail';
 	region: 'global' | 'cn';
 	viewerHeight: string;
 	showToolbar: boolean;
@@ -16,7 +16,7 @@ export interface XMindViewerSettings {
 
 export const DEFAULT_SETTINGS: XMindViewerSettings = {
 	defaultProperty: 'xmind',
-	renderMode: 'online',
+	renderMode: 'thumbnail',
 	region: 'global',
 	viewerHeight: '500px',
 	showToolbar: true,
@@ -33,6 +33,7 @@ interface FileCacheEntry {
 export default class XMindViewerPlugin extends Plugin {
 	settings: XMindViewerSettings;
 	private fileCache: Map<string, FileCacheEntry> = new Map();
+	private readonly MAX_FILE_CACHE = 20;
 	private preloadHandle: number | null = null;
 	private preloadIframe: HTMLIFrameElement | null = null;
 
@@ -182,6 +183,14 @@ export default class XMindViewerPlugin extends Plugin {
 		}
 
 		const data = await this.app.vault.readBinary(file);
+
+		// Enforce an LRU-like size cap so opening many different files in one
+		// session doesn't grow memory without bound.
+		while (this.fileCache.size >= this.MAX_FILE_CACHE) {
+			const oldest = this.fileCache.keys().next().value;
+			if (oldest === undefined) break;
+			this.fileCache.delete(oldest);
+		}
 		this.fileCache.set(file.path, { data, mtime: file.stat.mtime });
 		return data;
 	}

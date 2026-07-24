@@ -44,11 +44,11 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 			.setName(t('settings.renderMode.name'))
 			.setDesc(t('settings.renderMode.desc'))
 			.addDropdown(dropdown => dropdown
+				.addOption('thumbnail', t('settings.renderMode.thumbnail'))
 				.addOption('online', t('settings.renderMode.online'))
-				.addOption('offline', t('settings.renderMode.offline'))
 				.setValue(this.plugin.settings.renderMode)
 				.onChange(async (value) => {
-					this.plugin.settings.renderMode = value as 'online' | 'offline';
+					this.plugin.settings.renderMode = value as 'online' | 'thumbnail';
 					await this.plugin.saveSettings();
 					this.display();
 				}));

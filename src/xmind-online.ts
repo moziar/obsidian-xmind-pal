@@ -17,11 +17,21 @@ export function renderOnline(
 	});
 
 	const onMapReady = () => {
-		viewer.setFitMap();
-		// Remove loading placeholder once the mind map is rendered
-		if (loadingEl && loadingEl.parentNode) {
-			loadingEl.parentNode.removeChild(loadingEl);
-		}
+		// The viewer may report map-ready before its internal layout metrics are
+		// fully stable, especially when the container starts with zero/zero-ish
+		// dimensions. Defer fitMap and apply it a second time to avoid NaN zoom
+		// and misaligned nodes.
+		let placeholderRemoved = false;
+		const fitAndCleanup = () => {
+			viewer.setFitMap();
+			if (!placeholderRemoved && loadingEl?.parentNode) {
+				loadingEl.parentNode.removeChild(loadingEl);
+				placeholderRemoved = true;
+			}
+		};
+
+		requestAnimationFrame(fitAndCleanup);
+		window.setTimeout(fitAndCleanup, 100);
 	};
 
 	viewer.addEventListener('map-ready', onMapReady);

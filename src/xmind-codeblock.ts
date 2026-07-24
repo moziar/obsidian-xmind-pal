@@ -1,7 +1,7 @@
 import { MarkdownPostProcessorContext, MarkdownRenderChild, TFile, setIcon } from 'obsidian';
 import XMindViewerPlugin from './main';
 import { renderOnline } from './xmind-online';
-import { renderOffline } from './xmind-offline';
+import { renderThumbnail } from './xmind-thumbnail';
 import { t } from './i18n';
 
 export function registerXMindCodeBlock(plugin: XMindViewerPlugin): void {
@@ -102,16 +102,10 @@ async function processXMindBlock(
 		wrapper.appendChild(loadingEl);
 		setCleanup(renderOnline(wrapper, fileData, plugin.settings, loadingEl));
 	} else {
-		// Offline mode: show loading placeholder while parsing asynchronously
-		const loadingEl = createLoadingPlaceholder();
-		loadingEl.style.position = 'relative';
-		loadingEl.style.height = plugin.settings.viewerHeight;
-		viewerEl.appendChild(loadingEl);
-
-		renderOffline(viewerEl, fileData, plugin.settings, (cleanupFn) => {
-			loadingEl.remove();
-			setCleanup(cleanupFn);
-		});
+		// Thumbnail mode (default): render the XMind-generated preview image.
+		// Faster than iframe, fully native XMind fidelity, and supports Obsidian's
+		// built-in image Lightbox for zooming.
+		setCleanup(renderThumbnail(viewerEl, fileData, { viewerHeight: plugin.settings.viewerHeight }));
 	}
 }
 

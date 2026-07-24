@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-xmind-pal",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Embed and preview .xmind mind map files in your notes.",
 	"main": "main.js",
 	"scripts": {
