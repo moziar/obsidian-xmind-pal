@@ -49,7 +49,7 @@ export default class XMindViewerPlugin extends Plugin {
 			id: 'insert-xmind-codeblock',
 			name: t('command.insertCodeblock'),
 			editorCallback: (editor) => {
-				editor.replaceSelection('```xmind\n```');
+				editor.replaceSelection('```xmind-pal\n```');
 			},
 		});
 

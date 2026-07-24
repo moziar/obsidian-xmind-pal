@@ -5,7 +5,7 @@ import { renderOffline } from './xmind-offline';
 import { t } from './i18n';
 
 export function registerXMindCodeBlock(plugin: XMindViewerPlugin): void {
-	plugin.registerMarkdownCodeBlockProcessor('xmind', async (source, el, ctx) => {
+	plugin.registerMarkdownCodeBlockProcessor('xmind-pal', async (source, el, ctx) => {
 		const container = el.createDiv({ cls: 'xmind-viewer-container' });
 
 		const child = new MarkdownRenderChild(container);
