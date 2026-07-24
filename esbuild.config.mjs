@@ -35,6 +35,16 @@ function deployToVault() {
 			// for vault paths, but the system cp binary is permitted.
 			execFileSync("cp", ["-f", file, dest]);
 		}
+
+		// Create a .hotreload marker so Obsidian's Hot-Reload plugin will
+		// automatically reload this plugin when its files change. This file
+		// is local-only and should never be committed or published.
+		const hotreloadPath = path.join(deployConfig.vaultPluginDir, ".hotreload");
+		if (!fs.existsSync(hotreloadPath)) {
+			fs.writeFileSync(hotreloadPath, "");
+			console.log(`[deploy] created .hotreload marker`);
+		}
+
 		console.log(`[deploy] copied ${DEPLOY_FILES.length} files to ${deployConfig.vaultPluginDir}`);
 	} catch (e) {
 		console.error(`[deploy] failed: ${e.message}`);
