@@ -55,9 +55,12 @@ export interface ThumbnailRenderOptions {
  * Draw the source image onto a canvas inside `container`.
  * Called once the container is connected and has non-zero dimensions.
  *
- * `isCancelled` is checked inside the async `toBlob` callback so that an
- * unload arriving while encoding is in flight does not leak a blob URL:
- * on cancel we drop the blob before ever calling `URL.createObjectURL`.
+ * The canvas is encoded as a **data URI** (base64) rather than a blob URL.
+ * This is critical for Obsidian's image Lightbox: when the user clicks the
+ * thumbnail, the Lightbox creates a new <img> and loads the same src. Blob
+ * URLs can be revoked by cache eviction or re-rendering before the Lightbox
+ * opens, causing ERR_FILE_NOT_FOUND. Data URIs are self-contained and never
+ * expire, so the Lightbox can always load them.
  */
 function drawToCanvas(
 	sourceImg: HTMLImageElement,
@@ -65,7 +68,6 @@ function drawToCanvas(
 	viewportWidth: number,
 	viewportHeight: number,
 	fileName: string,
-	isCancelled: () => boolean,
 	onResult: (url: string) => void
 ): void {
 	// Scale down only when the thumbnail exceeds the viewport.
@@ -106,35 +108,25 @@ function drawToCanvas(
 	// Center the thumbnail inside the white viewport.
 	ctx.drawImage(sourceImg, x, y, drawWidth, drawHeight);
 
-	// Encode the canvas as a blob URL instead of base64 to reduce memory
-	// pressure and avoid a second base64 round trip.
-	canvas.toBlob((blob) => {
-		if (!blob) {
-			throw new Error('canvas toBlob failed');
-		}
-		// If the render child was unloaded while toBlob was encoding, drop
-		// the blob without creating a URL — otherwise the URL would be
-		// registered into the cache but never released (the cleanup fn
-		// already ran and saw `registered === false`).
-		if (isCancelled()) return;
-		const resultUrl = URL.createObjectURL(blob);
+	// Encode the canvas as a data URI (base64). Unlike blob URLs, data URIs
+	// never expire and can always be re-loaded by Obsidian's Lightbox.
+	const resultUrl = canvas.toDataURL('image/png');
 
-		const img = createEl('img');
-		// Use the xmind file name (without extension) as alt text so
-		// Obsidian's image Lightbox (v1.13.4+) displays it as the title.
-		img.alt = fileName.replace(/\.xmind$/i, '');
-		img.className = 'xmind-viewer-thumbnail-img';
-		// Keep the displayed size locked to the viewport so the high-DPI
-		// canvas is not stretched by the browser.
-		img.style.width = `${viewportWidth}px`;
-		img.style.height = `${viewportHeight}px`;
-		if (isNaturalSize) {
-			img.addClass('xmind-viewer-thumbnail-pixelated');
-		}
-		img.src = resultUrl;
-		container.appendChild(img);
-		onResult(resultUrl);
-	}, 'image/png');
+	const img = createEl('img');
+	// Use the xmind file name (without extension) as alt text so
+	// Obsidian's image Lightbox (v1.13.4+) displays it as the title.
+	img.alt = fileName.replace(/\.xmind$/i, '');
+	img.className = 'xmind-viewer-thumbnail-img';
+	// Keep the displayed size locked to the viewport so the high-DPI
+	// canvas is not stretched by the browser.
+	img.style.width = `${viewportWidth}px`;
+	img.style.height = `${viewportHeight}px`;
+	if (isNaturalSize) {
+		img.addClass('xmind-viewer-thumbnail-pixelated');
+	}
+	img.src = resultUrl;
+	container.appendChild(img);
+	onResult(resultUrl);
 }
 
 /**
@@ -158,11 +150,15 @@ export function renderThumbnail(
 	container.style.height = options.viewerHeight;
 	el.appendChild(container);
 
-	// Fast path: reuse a previously rendered canvas blob URL. Skips the
-	// unzip → Image → canvas → toBlob pipeline entirely. This is the
+	// Fast path: reuse a previously rendered canvas data URI. Skips the
+	// unzip → Image → canvas → toDataURL pipeline entirely. This is the
 	// critical path for Obsidian's Reading Mode virtual scroller, which
 	// repeatedly unloads and reloads the same section as the user scrolls.
-	const cached = plugin.acquireThumbnail(file);
+	//
+	// Data URIs are self-contained and never expire, so the cache entry
+	// can be reused by multiple <img> elements and Obsidian's Lightbox
+	// without any lifecycle management.
+	const cached = plugin.lookupThumbnail(file);
 	if (cached) {
 		const img = createEl('img');
 		img.alt = options.fileName.replace(/\.xmind$/i, '');
@@ -172,14 +168,12 @@ export function renderThumbnail(
 		img.src = cached.url;
 		container.appendChild(img);
 		return () => {
-			plugin.releaseThumbnail(file.path);
 			el.empty();
 		};
 	}
 
 	// Slow path: unzip + canvas render, then register the result.
 	let sourceUrl: string | null = null;
-	let registered = false;
 	let cancelled = false;
 
 	extractThumbnail(fileData).then(bytes => {
@@ -210,11 +204,12 @@ export function renderThumbnail(
 					return;
 				}
 
-				drawToCanvas(sourceImg, container, viewportWidth, viewportHeight, options.fileName, () => cancelled, (url) => {
-					// Hand ownership of the blob URL to the cache. It will be
-					// revoked when refCount reaches zero via releaseThumbnail.
+				drawToCanvas(sourceImg, container, viewportWidth, viewportHeight, options.fileName, (url) => {
+					// Cache the data URI for fast path reuse on re-renders.
+					// Data URIs don't need lifecycle management — they're
+					// just strings, garbage-collected when the cache entry
+					// is evicted.
 					plugin.registerThumbnail(file, url, viewportWidth, viewportHeight);
-					registered = true;
 				});
 			};
 			drawWhenReady();
@@ -236,9 +231,9 @@ export function renderThumbnail(
 		cancelled = true;
 		// sourceUrl is the raw thumbnail blob (pre-canvas); always revoke.
 		if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-		// The canvas result URL is owned by the cache once registered.
-		// Only release the reference — do not revoke directly.
-		if (registered) plugin.releaseThumbnail(file.path);
+		// The canvas result is a data URI stored in the cache. Data URIs
+		// are self-contained strings — no revoke needed, and the Lightbox
+		// can always re-load them even after this <img> is unloaded.
 		el.empty();
 	};
 }

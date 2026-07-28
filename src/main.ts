@@ -32,15 +32,13 @@ interface FileCacheEntry {
 }
 
 interface ThumbnailCacheEntry {
-	/** Canvas-encoded blob URL (with white background + DPR scaling). */
+	/** Canvas-encoded data URI (with white background + DPR scaling). */
 	url: string;
 	mtime: number;
 	/** CSS pixel width of the canvas output, used to size the <img>. */
 	width: number;
 	/** CSS pixel height of the canvas output, used to size the <img>. */
 	height: number;
-	/** Reference count; entry is freed when it drops to zero. */
-	refCount: number;
 }
 
 export default class XMindViewerPlugin extends Plugin {
@@ -226,43 +224,39 @@ export default class XMindViewerPlugin extends Plugin {
 	}
 
 	/**
-	 * Try to acquire a cached thumbnail blob URL for `file`.
+	 * Look up a cached thumbnail data URI for `file`.
 	 *
-	 * Returns the cache entry (with refCount already incremented) when a fresh
-	 * entry exists, or null when the cache misses. On miss the caller is
-	 * responsible for producing the thumbnail and calling `registerThumbnail`.
-	 * Stale entries (mtime mismatch) are evicted eagerly.
+	 * Returns the cache entry when a fresh entry exists, or null when the
+	 * cache misses. On miss the caller is responsible for producing the
+	 * thumbnail and calling `registerThumbnail`. Stale entries (mtime
+	 * mismatch) are evicted eagerly.
+	 *
+	 * The cache stores data URIs (not blob URLs), so there is no lifecycle
+	 * management needed — data URIs are self-contained strings that never
+	 * expire. This is critical for Obsidian's image Lightbox, which creates
+	 * a new <img> and re-loads the same src when the user clicks.
 	 */
-	acquireThumbnail(file: TFile): ThumbnailCacheEntry | null {
+	lookupThumbnail(file: TFile): ThumbnailCacheEntry | null {
 		const entry = this.thumbnailCache.get(file.path);
 		if (!entry) return null;
 		if (entry.mtime !== file.stat.mtime) {
-			URL.revokeObjectURL(entry.url);
 			this.thumbnailCache.delete(file.path);
 			return null;
 		}
-		entry.refCount++;
 		return entry;
 	}
 
 	/**
-	 * Register a freshly produced thumbnail blob URL in the cache. The caller
-	 * holds the first reference (refCount = 1). LRU-evicts older entries when
-	 * the cap is reached, revoking their blob URLs.
+	 * Register a freshly produced thumbnail data URI in the cache.
+	 * LRU-evicts older entries when the cap is reached.
 	 */
 	registerThumbnail(file: TFile, url: string, width: number, height: number): void {
 		// Replace any stale entry for this path (should normally be absent).
-		const existing = this.thumbnailCache.get(file.path);
-		if (existing) {
-			URL.revokeObjectURL(existing.url);
-			this.thumbnailCache.delete(file.path);
-		}
+		this.thumbnailCache.delete(file.path);
 
 		while (this.thumbnailCache.size >= this.MAX_THUMBNAIL_CACHE) {
 			const oldest = this.thumbnailCache.keys().next().value as string | undefined;
 			if (oldest === undefined) break;
-			const evicted = this.thumbnailCache.get(oldest);
-			if (evicted) URL.revokeObjectURL(evicted.url);
 			this.thumbnailCache.delete(oldest);
 		}
 
@@ -271,33 +265,14 @@ export default class XMindViewerPlugin extends Plugin {
 			mtime: file.stat.mtime,
 			width,
 			height,
-			refCount: 1,
 		});
 	}
 
 	/**
-	 * Release a reference to a cached thumbnail. When refCount reaches zero the
-	 * blob URL is revoked and the entry is removed.
-	 */
-	releaseThumbnail(path: string): void {
-		const entry = this.thumbnailCache.get(path);
-		if (!entry) return;
-		entry.refCount--;
-		if (entry.refCount <= 0) {
-			URL.revokeObjectURL(entry.url);
-			this.thumbnailCache.delete(path);
-		}
-	}
-
-	/**
-	 * Drop a cached thumbnail without touching refCount — used when the
-	 * underlying file changes, is deleted, or is renamed.
+	 * Drop a cached thumbnail — used when the underlying file changes,
+	 * is deleted, or is renamed.
 	 */
 	private invalidateThumbnail(path: string): void {
-		const entry = this.thumbnailCache.get(path);
-		if (entry) {
-			URL.revokeObjectURL(entry.url);
-			this.thumbnailCache.delete(path);
-		}
+		this.thumbnailCache.delete(path);
 	}
 }
