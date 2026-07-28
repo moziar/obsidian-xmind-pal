@@ -9,11 +9,24 @@ const THUMBNAIL_PATHS = [
 	'thumbnails/thumbnail.png',
 	'thumbnails/thumbnail.jpg',
 ];
+const THUMBNAIL_PATH_SET = new Set(THUMBNAIL_PATHS);
 
+/**
+ * Extract the thumbnail image from an .xmind (ZIP) archive.
+ *
+ * Uses fflate's `filter` option so only the thumbnail entry is decompressed;
+ * other entries (content.json, attachments/, etc.) are skipped at the
+ * local-file-header stage without spending CPU on inflate. This keeps both
+ * memory peak and CPU time low even for .xmind files that embed large
+ * attachments.
+ *
+ * The async `unzip` variant is used (not `unzipSync`) so decompression runs
+ * in a Web Worker and never blocks the main thread.
+ */
 function extractThumbnail(fileData: ArrayBuffer): Promise<Uint8Array> {
 	const compressed = new Uint8Array(fileData);
 	return new Promise<Unzipped>((resolve, reject) => {
-		unzip(compressed, (err, files) => {
+		unzip(compressed, { filter: (file) => THUMBNAIL_PATH_SET.has(file.name) }, (err, files) => {
 			if (err || !files) {
 				reject(err ?? new Error('unzip failed'));
 				return;
