@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext, MarkdownRenderChild, TFile, setIcon } from 'obsidian';
+import { App, MarkdownPostProcessorContext, MarkdownRenderChild, TFile, setIcon } from 'obsidian';
 import XMindViewerPlugin from './main';
 import { renderOnline } from './xmind-online';
 import { renderThumbnail } from './xmind-thumbnail';
@@ -120,7 +120,7 @@ function getPropertyLink(plugin: XMindViewerPlugin, sourcePath: string, property
 		return null;
 	}
 
-	const value = cache.frontmatter[propertyName];
+	const value: unknown = cache.frontmatter[propertyName];
 	if (!value || typeof value !== 'string') {
 		return null;
 	}
@@ -173,8 +173,13 @@ function createToolbar(
 	}
 }
 
+/** Minimal interface for the undocumented `app.openWithDefaultApp` API. */
+interface AppWithDefaultApp {
+	openWithDefaultApp?: (path: string) => void;
+}
+
 function openWithDefaultApp(plugin: XMindViewerPlugin, file: TFile): void {
-	const app = plugin.app as any;
+	const app = plugin.app as App & AppWithDefaultApp;
 	if (typeof app.openWithDefaultApp === 'function') {
 		app.openWithDefaultApp(file.path);
 	}
@@ -186,14 +191,14 @@ export function showError(container: HTMLElement, message: string): void {
 }
 
 function createLoadingPlaceholder(): HTMLElement {
-	const el = document.createElement('div');
+	const el = createDiv();
 	el.className = 'xmind-viewer-loading';
 
-	const spinner = document.createElement('div');
+	const spinner = createDiv();
 	spinner.className = 'xmind-viewer-spinner';
 	el.appendChild(spinner);
 
-	const text = document.createElement('div');
+	const text = createDiv();
 	text.className = 'xmind-viewer-loading-text';
 	text.textContent = t('ui.loadingMindMap');
 	el.appendChild(text);

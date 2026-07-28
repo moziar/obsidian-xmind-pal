@@ -78,12 +78,11 @@ export default class XMindViewerPlugin extends Plugin {
 			},
 		});
 
-		// Warm up DNS/TLS connection to XMind embed service for faster iframe loading
-		injectPreconnect(this.settings.region);
-
 		// Preload the XMind embed-viewer page so browser caches its JS/HTML/CSS.
 		// First-view latency is dominated by iframe resource download; this brings
-		// every subsequent file close to "already loaded" speed.
+		// every subsequent file close to "already loaded" speed. The hidden
+		// iframe also warms DNS/TLS to the embed service, so no separate
+		// <link rel="preconnect"> is needed.
 		if (this.settings.preloadViewer && this.settings.renderMode === 'online') {
 			// If Obsidian has finished starting up (e.g. plugin enabled manually
 			// from settings after launch), preload immediately — idle scheduling
@@ -120,7 +119,7 @@ export default class XMindViewerPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()) as XMindViewerSettings;
 	}
 
 	async saveSettings() {
@@ -154,13 +153,15 @@ export default class XMindViewerPlugin extends Plugin {
 		};
 		// requestIdleCallback may never fire if the main thread stays busy;
 		// the timeout ensures we eventually preload.
-		const ric = (window as any).requestIdleCallback as
-			| ((cb: () => void, opts?: { timeout: number }) => number)
-			| undefined;
-		if (ric) {
-			this.preloadHandle = ric(run, { timeout: 2000 });
+		type WindowWithIdle = Window & {
+			requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+			cancelIdleCallback?: (handle: number) => void;
+		};
+		const win = window as WindowWithIdle;
+		if (typeof win.requestIdleCallback === 'function') {
+			this.preloadHandle = win.requestIdleCallback(run, { timeout: 2000 });
 		} else {
-			this.preloadHandle = window.setTimeout(run, 2000) as unknown as number;
+			this.preloadHandle = window.setTimeout(run, 2000);
 		}
 	}
 
@@ -173,8 +174,8 @@ export default class XMindViewerPlugin extends Plugin {
 	private preloadViewer(): void {
 		if (this.preloadIframe) return;
 		const domain = this.settings.region === 'cn' ? 'https://www.xmind.cn' : 'https://www.xmind.app';
-		const iframe = document.createElement('iframe');
-		iframe.style.display = 'none';
+		const iframe = createEl('iframe');
+		iframe.setCssProps({ display: 'none' });
 		iframe.setAttribute('aria-hidden', 'true');
 		iframe.setAttribute('tabindex', '-1');
 		iframe.src = `${domain}/embed-viewer`;
@@ -184,11 +185,12 @@ export default class XMindViewerPlugin extends Plugin {
 
 	clearPreload(): void {
 		if (this.preloadHandle !== null) {
-			const cic = (window as any).cancelIdleCallback as
-				| ((handle: number) => void)
-				| undefined;
-			if (cic) {
-				cic(this.preloadHandle);
+			type WindowWithIdle = Window & {
+				cancelIdleCallback?: (handle: number) => void;
+			};
+			const win = window as WindowWithIdle;
+			if (typeof win.cancelIdleCallback === 'function') {
+				win.cancelIdleCallback(this.preloadHandle);
 			} else {
 				window.clearTimeout(this.preloadHandle);
 			}
@@ -215,7 +217,7 @@ export default class XMindViewerPlugin extends Plugin {
 		// Enforce an LRU-like size cap so opening many different files in one
 		// session doesn't grow memory without bound.
 		while (this.fileCache.size >= this.MAX_FILE_CACHE) {
-			const oldest = this.fileCache.keys().next().value;
+			const oldest = this.fileCache.keys().next().value as string | undefined;
 			if (oldest === undefined) break;
 			this.fileCache.delete(oldest);
 		}
@@ -257,7 +259,7 @@ export default class XMindViewerPlugin extends Plugin {
 		}
 
 		while (this.thumbnailCache.size >= this.MAX_THUMBNAIL_CACHE) {
-			const oldest = this.thumbnailCache.keys().next().value;
+			const oldest = this.thumbnailCache.keys().next().value as string | undefined;
 			if (oldest === undefined) break;
 			const evicted = this.thumbnailCache.get(oldest);
 			if (evicted) URL.revokeObjectURL(evicted.url);
@@ -298,17 +300,4 @@ export default class XMindViewerPlugin extends Plugin {
 			this.thumbnailCache.delete(path);
 		}
 	}
-}
-
-/**
- * Inject <link rel="preconnect"> to warm up DNS/TLS connection to the XMind embed service.
- * This reduces latency when the first iframe is created.
- */
-function injectPreconnect(region: 'global' | 'cn'): void {
-	const domain = region === 'cn' ? 'https://www.xmind.cn' : 'https://www.xmind.app';
-	if (document.head.querySelector(`link[rel="preconnect"][href="${domain}"]`)) return;
-	const link = document.createElement('link');
-	link.rel = 'preconnect';
-	link.href = domain;
-	document.head.appendChild(link);
 }

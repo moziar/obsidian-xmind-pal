@@ -84,7 +84,7 @@ function drawToCanvas(
 
 	// Render at device pixel density so the image stays sharp on HiDPI screens.
 	const dpr = window.devicePixelRatio || 1;
-	const canvas = document.createElement('canvas');
+	const canvas = createEl('canvas');
 	canvas.width = Math.round(viewportWidth * dpr);
 	canvas.height = Math.round(viewportHeight * dpr);
 
@@ -119,7 +119,7 @@ function drawToCanvas(
 		if (isCancelled()) return;
 		const resultUrl = URL.createObjectURL(blob);
 
-		const img = document.createElement('img');
+		const img = createEl('img');
 		// Use the xmind file name (without extension) as alt text so
 		// Obsidian's image Lightbox (v1.13.4+) displays it as the title.
 		img.alt = fileName.replace(/\.xmind$/i, '');
@@ -129,7 +129,7 @@ function drawToCanvas(
 		img.style.width = `${viewportWidth}px`;
 		img.style.height = `${viewportHeight}px`;
 		if (isNaturalSize) {
-			img.style.imageRendering = 'pixelated';
+			img.addClass('xmind-viewer-thumbnail-pixelated');
 		}
 		img.src = resultUrl;
 		container.appendChild(img);
@@ -153,7 +153,7 @@ export function renderThumbnail(
 	plugin: XMindViewerPlugin,
 	options: ThumbnailRenderOptions
 ): () => void {
-	const container = document.createElement('div');
+	const container = createDiv();
 	container.className = 'xmind-viewer-thumbnail';
 	container.style.height = options.viewerHeight;
 	el.appendChild(container);
@@ -164,7 +164,7 @@ export function renderThumbnail(
 	// repeatedly unloads and reloads the same section as the user scrolls.
 	const cached = plugin.acquireThumbnail(file);
 	if (cached) {
-		const img = document.createElement('img');
+		const img = createEl('img');
 		img.alt = options.fileName.replace(/\.xmind$/i, '');
 		img.className = 'xmind-viewer-thumbnail-img';
 		img.style.width = `${cached.width}px`;
@@ -206,7 +206,7 @@ export function renderThumbnail(
 					// Container not ready yet. Schedule another check on the next
 					// animation frame. This naturally stops when the container
 					// becomes visible or when cancelled is set by onunload.
-					requestAnimationFrame(drawWhenReady);
+					window.requestAnimationFrame(drawWhenReady);
 					return;
 				}
 
@@ -226,7 +226,7 @@ export function renderThumbnail(
 	}).catch(e => {
 		if (cancelled) return;
 		container.empty();
-		const errorEl = document.createElement('div');
+		const errorEl = createDiv();
 		errorEl.className = 'xmind-viewer-error';
 		errorEl.textContent = t('error.thumbnailFailed', { message: e instanceof Error ? e.message : String(e) });
 		el.appendChild(errorEl);

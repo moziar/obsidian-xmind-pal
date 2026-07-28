@@ -140,3 +140,7 @@
 	max-height: 100%;
 	cursor: zoom-in;
 }
+
+.xmind-viewer-thumbnail-pixelated {
+	image-rendering: pixelated;
+}

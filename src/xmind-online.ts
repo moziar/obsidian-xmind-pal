@@ -33,7 +33,7 @@ export function renderOnline(
 			}
 		};
 
-		rafId = requestAnimationFrame(fitAndCleanup);
+		rafId = window.requestAnimationFrame(fitAndCleanup);
 		timerId = window.setTimeout(fitAndCleanup, 100);
 	};
 

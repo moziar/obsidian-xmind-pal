@@ -54,7 +54,7 @@ export function registerXMindComment(plugin: XMindViewerPlugin): void {
 		// Find empty paragraphs that correspond to stripped comments.
 		// Obsidian removes `%%...%%` from the DOM but leaves an empty `<p>`.
 		const paragraphs = el.tagName === 'P'
-			? [el as HTMLElement]
+			? [el]
 			: Array.from(el.querySelectorAll('p'));
 		const emptyParagraphs = paragraphs.filter(p => !p.textContent?.trim());
 
@@ -67,7 +67,7 @@ export function registerXMindComment(plugin: XMindViewerPlugin): void {
 			const p = emptyParagraphs[i];
 			const content = directives[i];
 
-			const container = document.createElement('div');
+			const container = createDiv();
 			container.className = 'xmind-viewer-container';
 			p.replaceWith(container);
 
