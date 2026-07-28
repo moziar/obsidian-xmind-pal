@@ -29,6 +29,11 @@ function extractThumbnail(fileData: ArrayBuffer): Promise<Uint8Array> {
 
 export interface ThumbnailRenderOptions {
 	viewerHeight: string;
+	/**
+	 * File name to display in Obsidian's image Lightbox (v1.13.4+).
+	 * The `.xmind` extension is stripped automatically.
+	 */
+	fileName: string;
 }
 
 /**
@@ -40,6 +45,7 @@ function drawToCanvas(
 	container: HTMLElement,
 	viewportWidth: number,
 	viewportHeight: number,
+	fileName: string,
 	onResult: (url: string) => void
 ): void {
 	// Scale down only when the thumbnail exceeds the viewport.
@@ -89,7 +95,9 @@ function drawToCanvas(
 		const resultUrl = URL.createObjectURL(blob);
 
 		const img = document.createElement('img');
-		img.alt = t('ui.mindMapThumbnail');
+		// Use the xmind file name (without extension) as alt text so
+		// Obsidian's image Lightbox (v1.13.4+) displays it as the title.
+		img.alt = fileName.replace(/\.xmind$/i, '');
 		img.className = 'xmind-viewer-thumbnail-img';
 		// Keep the displayed size locked to the viewport so the high-DPI
 		// canvas is not stretched by the browser.
@@ -155,7 +163,7 @@ export function renderThumbnail(
 					return;
 				}
 
-				drawToCanvas(sourceImg, container, viewportWidth, viewportHeight, (url) => {
+				drawToCanvas(sourceImg, container, viewportWidth, viewportHeight, options.fileName, (url) => {
 					resultUrl = url;
 				});
 			};

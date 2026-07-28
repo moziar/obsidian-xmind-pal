@@ -105,7 +105,7 @@ export async function processXMindBlock(
 		// Thumbnail mode (default): render the XMind-generated preview image.
 		// Faster than iframe, fully native XMind fidelity, and supports Obsidian's
 		// built-in image Lightbox for zooming.
-		setCleanup(renderThumbnail(viewerEl, fileData, { viewerHeight: plugin.settings.viewerHeight }));
+		setCleanup(renderThumbnail(viewerEl, fileData, { viewerHeight: plugin.settings.viewerHeight, fileName: file.name }));
 	}
 }
 
