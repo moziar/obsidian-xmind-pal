@@ -1,6 +1,7 @@
 import { Plugin, TFile, moment } from 'obsidian';
 import { XMindViewerSettingTab } from './settings';
 import { registerXMindCodeBlock } from './xmind-codeblock';
+import { registerXMindComment } from './xmind-comment';
 import { setLocale, t } from './i18n';
 
 export interface XMindViewerSettings {
@@ -45,12 +46,21 @@ export default class XMindViewerPlugin extends Plugin {
 		this.addSettingTab(new XMindViewerSettingTab(this.app, this));
 
 		registerXMindCodeBlock(this);
+		registerXMindComment(this);
 
 		this.addCommand({
 			id: 'insert-xmind-codeblock',
 			name: t('command.insertCodeblock'),
 			editorCallback: (editor) => {
 				editor.replaceSelection('```xmind-pal\n```');
+			},
+		});
+
+		this.addCommand({
+			id: 'insert-xmind-comment',
+			name: t('command.insertComment'),
+			editorCallback: (editor) => {
+				editor.replaceSelection('%%xmind-pal%%');
 			},
 		});
 

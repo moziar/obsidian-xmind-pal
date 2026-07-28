@@ -26,7 +26,7 @@ export function registerXMindCodeBlock(plugin: XMindViewerPlugin): void {
 	});
 }
 
-async function processXMindBlock(
+export async function processXMindBlock(
 	plugin: XMindViewerPlugin,
 	source: string,
 	container: HTMLElement,
@@ -180,7 +180,7 @@ function openWithDefaultApp(plugin: XMindViewerPlugin, file: TFile): void {
 	}
 }
 
-function showError(container: HTMLElement, message: string): void {
+export function showError(container: HTMLElement, message: string): void {
 	const errorEl = container.createDiv({ cls: 'xmind-viewer-error' });
 	errorEl.textContent = message;
 }
