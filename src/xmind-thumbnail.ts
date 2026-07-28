@@ -54,6 +54,10 @@ export interface ThumbnailRenderOptions {
 /**
  * Draw the source image onto a canvas inside `container`.
  * Called once the container is connected and has non-zero dimensions.
+ *
+ * `isCancelled` is checked inside the async `toBlob` callback so that an
+ * unload arriving while encoding is in flight does not leak a blob URL:
+ * on cancel we drop the blob before ever calling `URL.createObjectURL`.
  */
 function drawToCanvas(
 	sourceImg: HTMLImageElement,
@@ -61,6 +65,7 @@ function drawToCanvas(
 	viewportWidth: number,
 	viewportHeight: number,
 	fileName: string,
+	isCancelled: () => boolean,
 	onResult: (url: string) => void
 ): void {
 	// Scale down only when the thumbnail exceeds the viewport.
@@ -107,6 +112,11 @@ function drawToCanvas(
 		if (!blob) {
 			throw new Error('canvas toBlob failed');
 		}
+		// If the render child was unloaded while toBlob was encoding, drop
+		// the blob without creating a URL — otherwise the URL would be
+		// registered into the cache but never released (the cleanup fn
+		// already ran and saw `registered === false`).
+		if (isCancelled()) return;
 		const resultUrl = URL.createObjectURL(blob);
 
 		const img = document.createElement('img');
@@ -200,7 +210,7 @@ export function renderThumbnail(
 					return;
 				}
 
-				drawToCanvas(sourceImg, container, viewportWidth, viewportHeight, options.fileName, (url) => {
+				drawToCanvas(sourceImg, container, viewportWidth, viewportHeight, options.fileName, () => cancelled, (url) => {
 					// Hand ownership of the blob URL to the cache. It will be
 					// revoked when refCount reaches zero via releaseThumbnail.
 					plugin.registerThumbnail(file, url, viewportWidth, viewportHeight);

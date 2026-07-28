@@ -16,6 +16,9 @@ export function renderOnline(
 		},
 	});
 
+	let rafId = 0;
+	let timerId = 0;
+
 	const onMapReady = () => {
 		// The viewer may report map-ready before its internal layout metrics are
 		// fully stable, especially when the container starts with zero/zero-ish
@@ -30,14 +33,18 @@ export function renderOnline(
 			}
 		};
 
-		requestAnimationFrame(fitAndCleanup);
-		window.setTimeout(fitAndCleanup, 100);
+		rafId = requestAnimationFrame(fitAndCleanup);
+		timerId = window.setTimeout(fitAndCleanup, 100);
 	};
 
 	viewer.addEventListener('map-ready', onMapReady);
 	viewer.load(fileData);
 
 	return () => {
+		// Cancel any deferred fitAndCleanup calls so we never touch `viewer`
+		// after it has been torn down by el.empty() below.
+		cancelAnimationFrame(rafId);
+		window.clearTimeout(timerId);
 		viewer.removeEventListener('map-ready', onMapReady);
 		el.empty();
 	};
