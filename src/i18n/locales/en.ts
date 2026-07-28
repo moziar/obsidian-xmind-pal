@@ -49,5 +49,4 @@ export default {
 	// UI
 	'ui.openWithDefaultApp': 'Open with default app',
 	'ui.loadingMindMap': 'Loading mind map...',
-	'ui.mindMapThumbnail': 'Mind map thumbnail',
 };

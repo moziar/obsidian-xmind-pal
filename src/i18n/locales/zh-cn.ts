@@ -49,5 +49,4 @@ export default {
 	// UI
 	'ui.openWithDefaultApp': '使用默认应用打开',
 	'ui.loadingMindMap': '正在加载思维导图...',
-	'ui.mindMapThumbnail': '思维导图缩略图',
 };
