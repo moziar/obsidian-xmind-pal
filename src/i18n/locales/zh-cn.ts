@@ -11,17 +11,17 @@ export default {
 	'settings.defaultProperty.placeholder': 'xmind',
 
 	'settings.renderMode.name': '渲染模式',
-	'settings.renderMode.desc': '缩略图模式显示 XMind 生成的预览图（最快、原生效果）。在线模式使用 XMind 嵌入服务（需要网络）。',
-	'settings.renderMode.thumbnail': '缩略图（XMind 预览图）',
-	'settings.renderMode.online': '在线（XMind 嵌入服务）',
+	'settings.renderMode.desc': '缩略图模式显示 Xmind 生成的预览图（最快、原生效果）。在线模式使用 Xmind 嵌入服务（需要网络）。',
+	'settings.renderMode.thumbnail': '缩略图（Xmind 预览图）',
+	'settings.renderMode.online': '在线（Xmind 嵌入服务）',
 
 	'settings.region.name': '区域',
-	'settings.region.desc': 'XMind 嵌入服务区域。在中国大陆使用 "cn" 可加快加载速度。',
+	'settings.region.desc': 'Xmind 嵌入服务区域。在中国大陆使用 "cn" 可加快加载速度。',
 	'settings.region.global': '全球 (xmind.app)',
 	'settings.region.cn': '中国 (xmind.cn)',
 
 	'settings.preloadViewer.name': '启动时预加载查看器',
-	'settings.preloadViewer.desc': '在启动时后台加载 XMind 嵌入页面，让首次预览打开更快。仅在线模式下有效。',
+	'settings.preloadViewer.desc': '在启动时后台加载 Xmind 嵌入页面，让首次预览打开更快。仅在线模式下有效。',
 
 	'settings.viewerHeight.name': '查看器高度',
 	'settings.viewerHeight.desc': '嵌入查看器的 CSS 高度。',
@@ -34,7 +34,8 @@ export default {
 	'settings.doubleClickOpen.desc': '双击工具栏区域以默认应用程序打开 xmind 文件。',
 
 	// Commands
-	'command.insertCodeblock': '插入 XMind 查看器代码块',
+	'command.insertCodeblock': '插入 Xmind Pal 代码块',
+	'command.insertComment': '插入 Xmind Pal 注释',
 
 	// Errors
 	'error.renderFailed': '渲染失败：{message}',
