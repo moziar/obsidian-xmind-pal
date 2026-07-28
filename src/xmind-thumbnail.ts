@@ -1,4 +1,6 @@
+import { TFile } from 'obsidian';
 import { unzip, Unzipped } from 'fflate';
+import XMindViewerPlugin from './main';
 import { t } from './i18n';
 
 const THUMBNAIL_PATHS = [
@@ -123,7 +125,9 @@ function drawToCanvas(
  */
 export function renderThumbnail(
 	el: HTMLElement,
+	file: TFile,
 	fileData: ArrayBuffer,
+	plugin: XMindViewerPlugin,
 	options: ThumbnailRenderOptions
 ): () => void {
 	const container = document.createElement('div');
@@ -131,8 +135,28 @@ export function renderThumbnail(
 	container.style.height = options.viewerHeight;
 	el.appendChild(container);
 
+	// Fast path: reuse a previously rendered canvas blob URL. Skips the
+	// unzip → Image → canvas → toBlob pipeline entirely. This is the
+	// critical path for Obsidian's Reading Mode virtual scroller, which
+	// repeatedly unloads and reloads the same section as the user scrolls.
+	const cached = plugin.acquireThumbnail(file);
+	if (cached) {
+		const img = document.createElement('img');
+		img.alt = options.fileName.replace(/\.xmind$/i, '');
+		img.className = 'xmind-viewer-thumbnail-img';
+		img.style.width = `${cached.width}px`;
+		img.style.height = `${cached.height}px`;
+		img.src = cached.url;
+		container.appendChild(img);
+		return () => {
+			plugin.releaseThumbnail(file.path);
+			el.empty();
+		};
+	}
+
+	// Slow path: unzip + canvas render, then register the result.
 	let sourceUrl: string | null = null;
-	let resultUrl: string | null = null;
+	let registered = false;
 	let cancelled = false;
 
 	extractThumbnail(fileData).then(bytes => {
@@ -164,7 +188,10 @@ export function renderThumbnail(
 				}
 
 				drawToCanvas(sourceImg, container, viewportWidth, viewportHeight, options.fileName, (url) => {
-					resultUrl = url;
+					// Hand ownership of the blob URL to the cache. It will be
+					// revoked when refCount reaches zero via releaseThumbnail.
+					plugin.registerThumbnail(file, url, viewportWidth, viewportHeight);
+					registered = true;
 				});
 			};
 			drawWhenReady();
@@ -184,8 +211,11 @@ export function renderThumbnail(
 
 	return () => {
 		cancelled = true;
+		// sourceUrl is the raw thumbnail blob (pre-canvas); always revoke.
 		if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-		if (resultUrl) URL.revokeObjectURL(resultUrl);
+		// The canvas result URL is owned by the cache once registered.
+		// Only release the reference — do not revoke directly.
+		if (registered) plugin.releaseThumbnail(file.path);
 		el.empty();
 	};
 }

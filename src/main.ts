@@ -31,10 +31,24 @@ interface FileCacheEntry {
 	mtime: number;
 }
 
+interface ThumbnailCacheEntry {
+	/** Canvas-encoded blob URL (with white background + DPR scaling). */
+	url: string;
+	mtime: number;
+	/** CSS pixel width of the canvas output, used to size the <img>. */
+	width: number;
+	/** CSS pixel height of the canvas output, used to size the <img>. */
+	height: number;
+	/** Reference count; entry is freed when it drops to zero. */
+	refCount: number;
+}
+
 export default class XMindViewerPlugin extends Plugin {
 	settings: XMindViewerSettings;
 	private fileCache: Map<string, FileCacheEntry> = new Map();
 	private readonly MAX_FILE_CACHE = 20;
+	private thumbnailCache: Map<string, ThumbnailCacheEntry> = new Map();
+	private readonly MAX_THUMBNAIL_CACHE = 20;
 	private preloadHandle: number | null = null;
 	private preloadIframe: HTMLIFrameElement | null = null;
 
@@ -86,17 +100,21 @@ export default class XMindViewerPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on('modify', (file) => {
 			if (file instanceof TFile && file.extension === 'xmind') {
 				this.fileCache.delete(file.path);
+				this.invalidateThumbnail(file.path);
 			}
 		}));
 		this.registerEvent(this.app.vault.on('delete', (file) => {
 			if (file instanceof TFile && file.extension === 'xmind') {
 				this.fileCache.delete(file.path);
+				this.invalidateThumbnail(file.path);
 			}
 		}));
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
 			if (file instanceof TFile && file.extension === 'xmind') {
 				this.fileCache.delete(oldPath);
 				this.fileCache.delete(file.path);
+				this.invalidateThumbnail(oldPath);
+				this.invalidateThumbnail(file.path);
 			}
 		}));
 	}
@@ -203,6 +221,82 @@ export default class XMindViewerPlugin extends Plugin {
 		}
 		this.fileCache.set(file.path, { data, mtime: file.stat.mtime });
 		return data;
+	}
+
+	/**
+	 * Try to acquire a cached thumbnail blob URL for `file`.
+	 *
+	 * Returns the cache entry (with refCount already incremented) when a fresh
+	 * entry exists, or null when the cache misses. On miss the caller is
+	 * responsible for producing the thumbnail and calling `registerThumbnail`.
+	 * Stale entries (mtime mismatch) are evicted eagerly.
+	 */
+	acquireThumbnail(file: TFile): ThumbnailCacheEntry | null {
+		const entry = this.thumbnailCache.get(file.path);
+		if (!entry) return null;
+		if (entry.mtime !== file.stat.mtime) {
+			URL.revokeObjectURL(entry.url);
+			this.thumbnailCache.delete(file.path);
+			return null;
+		}
+		entry.refCount++;
+		return entry;
+	}
+
+	/**
+	 * Register a freshly produced thumbnail blob URL in the cache. The caller
+	 * holds the first reference (refCount = 1). LRU-evicts older entries when
+	 * the cap is reached, revoking their blob URLs.
+	 */
+	registerThumbnail(file: TFile, url: string, width: number, height: number): void {
+		// Replace any stale entry for this path (should normally be absent).
+		const existing = this.thumbnailCache.get(file.path);
+		if (existing) {
+			URL.revokeObjectURL(existing.url);
+			this.thumbnailCache.delete(file.path);
+		}
+
+		while (this.thumbnailCache.size >= this.MAX_THUMBNAIL_CACHE) {
+			const oldest = this.thumbnailCache.keys().next().value;
+			if (oldest === undefined) break;
+			const evicted = this.thumbnailCache.get(oldest);
+			if (evicted) URL.revokeObjectURL(evicted.url);
+			this.thumbnailCache.delete(oldest);
+		}
+
+		this.thumbnailCache.set(file.path, {
+			url,
+			mtime: file.stat.mtime,
+			width,
+			height,
+			refCount: 1,
+		});
+	}
+
+	/**
+	 * Release a reference to a cached thumbnail. When refCount reaches zero the
+	 * blob URL is revoked and the entry is removed.
+	 */
+	releaseThumbnail(path: string): void {
+		const entry = this.thumbnailCache.get(path);
+		if (!entry) return;
+		entry.refCount--;
+		if (entry.refCount <= 0) {
+			URL.revokeObjectURL(entry.url);
+			this.thumbnailCache.delete(path);
+		}
+	}
+
+	/**
+	 * Drop a cached thumbnail without touching refCount — used when the
+	 * underlying file changes, is deleted, or is renamed.
+	 */
+	private invalidateThumbnail(path: string): void {
+		const entry = this.thumbnailCache.get(path);
+		if (entry) {
+			URL.revokeObjectURL(entry.url);
+			this.thumbnailCache.delete(path);
+		}
 	}
 }
 
