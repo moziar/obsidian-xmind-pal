@@ -215,9 +215,10 @@ export default class XMindViewerPlugin extends Plugin {
 		// Enforce an LRU-like size cap so opening many different files in one
 		// session doesn't grow memory without bound.
 		while (this.fileCache.size >= this.MAX_FILE_CACHE) {
-			const oldest = this.fileCache.keys().next().value as string | undefined;
-			if (oldest === undefined) break;
-			this.fileCache.delete(oldest);
+			for (const oldest of this.fileCache.keys()) {
+				this.fileCache.delete(oldest);
+				break;
+			}
 		}
 		this.fileCache.set(file.path, { data, mtime: file.stat.mtime });
 		return data;
@@ -255,9 +256,10 @@ export default class XMindViewerPlugin extends Plugin {
 		this.thumbnailCache.delete(file.path);
 
 		while (this.thumbnailCache.size >= this.MAX_THUMBNAIL_CACHE) {
-			const oldest = this.thumbnailCache.keys().next().value as string | undefined;
-			if (oldest === undefined) break;
-			this.thumbnailCache.delete(oldest);
+			for (const oldest of this.thumbnailCache.keys()) {
+				this.thumbnailCache.delete(oldest);
+				break;
+			}
 		}
 
 		this.thumbnailCache.set(file.path, {
