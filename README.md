@@ -2,7 +2,7 @@
 
 Embed and preview `.xmind` mind map files directly in your Obsidian notes.
 
-[简体中文](docs/README-zh.md)
+[简体中文](https://github.com/moziar/obsidian-xmind-pal/blob/main/docs/README-zh.md)
 
 ## Features
 
