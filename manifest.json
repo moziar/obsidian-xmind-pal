@@ -1,8 +1,8 @@
 {
 	"id": "xmind-pal",
 	"name": "Xmind Pal",
-	"version": "0.3.3",
-	"minAppVersion": "1.5.0",
+	"version": "0.3.4",
+	"minAppVersion": "1.13.0",
 	"description": "Embed and preview .xmind mind map files in your notes.",
 	"author": "Moz",
 	"authorUrl": "https://github.com/moziar",
