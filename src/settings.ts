@@ -1,8 +1,9 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, SettingDefinitionItem } from 'obsidian';
 import XMindViewerPlugin from './main';
 import { t } from './i18n';
 
 export class XMindViewerSettingTab extends PluginSettingTab {
+	icon: string = 'chart-network';
 	plugin: XMindViewerPlugin;
 
 	constructor(app: App, plugin: XMindViewerPlugin) {
@@ -10,114 +11,132 @@ export class XMindViewerSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		const defs: SettingDefinitionItem[] = [
+			{
+				name: t('settings.language.name'),
+				desc: t('settings.language.desc'),
+				control: {
+					type: 'dropdown',
+					key: 'language',
+					options: {
+						auto: t('settings.language.auto'),
+						zh: t('settings.language.zh'),
+						en: t('settings.language.en'),
+					},
+				},
+			},
+			{
+				name: t('settings.defaultProperty.name'),
+				desc: t('settings.defaultProperty.desc'),
+				control: {
+					type: 'text',
+					key: 'defaultProperty',
+					placeholder: t('settings.defaultProperty.placeholder'),
+				},
+			},
+			{
+				name: t('settings.renderMode.name'),
+				desc: t('settings.renderMode.desc'),
+				control: {
+					type: 'dropdown',
+					key: 'renderMode',
+					options: {
+						thumbnail: t('settings.renderMode.thumbnail'),
+						online: t('settings.renderMode.online'),
+					},
+				},
+			},
+			{
+				name: t('settings.region.name'),
+				desc: t('settings.region.desc'),
+				visible: () => this.plugin.settings.renderMode === 'online',
+				control: {
+					type: 'dropdown',
+					key: 'region',
+					options: {
+						global: t('settings.region.global'),
+						cn: t('settings.region.cn'),
+					},
+				},
+			},
+			{
+				name: t('settings.preloadViewer.name'),
+				desc: t('settings.preloadViewer.desc'),
+				visible: () => this.plugin.settings.renderMode === 'online',
+				control: {
+					type: 'toggle',
+					key: 'preloadViewer',
+				},
+			},
+			{
+				name: t('settings.viewerHeight.name'),
+				desc: t('settings.viewerHeight.desc'),
+				control: {
+					type: 'text',
+					key: 'viewerHeight',
+					placeholder: t('settings.viewerHeight.placeholder'),
+				},
+			},
+			{
+				name: t('settings.showToolbar.name'),
+				desc: t('settings.showToolbar.desc'),
+				control: {
+					type: 'toggle',
+					key: 'showToolbar',
+				},
+			},
+			{
+				name: t('settings.doubleClickOpen.name'),
+				desc: t('settings.doubleClickOpen.desc'),
+				visible: () => this.plugin.settings.showToolbar,
+				control: {
+					type: 'toggle',
+					key: 'doubleClickOpen',
+				},
+			},
+		];
+		return defs;
+	}
 
-		new Setting(containerEl)
-			.setName(t('settings.language.name'))
-			.setDesc(t('settings.language.desc'))
-			.addDropdown(dropdown => dropdown
-				.addOption('auto', t('settings.language.auto'))
-				.addOption('zh', t('settings.language.zh'))
-				.addOption('en', t('settings.language.en'))
-				.setValue(this.plugin.settings.language)
-				.onChange(async (value) => {
-					this.plugin.settings.language = value as 'auto' | 'en' | 'zh';
-					await this.plugin.saveSettings();
-					this.plugin.applyLocale();
-					this.display();
-				}));
+	/**
+	 * Persist setting changes and trigger side effects.
+	 *
+	 * The framework auto-saves for `control` bindings, but we override to
+	 * run side effects (locale switch, preload scheduling, visibility
+	 * refresh) that the declarative API can't express on its own.
+	 */
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		Object.assign(this.plugin.settings, { [key]: value });
+		await this.plugin.saveSettings();
 
-		new Setting(containerEl)
-			.setName(t('settings.defaultProperty.name'))
-			.setDesc(t('settings.defaultProperty.desc'))
-			.addText(text => text
-				.setPlaceholder(t('settings.defaultProperty.placeholder'))
-				.setValue(this.plugin.settings.defaultProperty)
-				.onChange(async (value) => {
-					this.plugin.settings.defaultProperty = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName(t('settings.renderMode.name'))
-			.setDesc(t('settings.renderMode.desc'))
-			.addDropdown(dropdown => dropdown
-				.addOption('thumbnail', t('settings.renderMode.thumbnail'))
-				.addOption('online', t('settings.renderMode.online'))
-				.setValue(this.plugin.settings.renderMode)
-				.onChange(async (value) => {
-					this.plugin.settings.renderMode = value as 'online' | 'thumbnail';
-					await this.plugin.saveSettings();
-					this.display();
-				}));
-
-		if (this.plugin.settings.renderMode === 'online') {
-			new Setting(containerEl)
-				.setName(t('settings.region.name'))
-				.setDesc(t('settings.region.desc'))
-				.addDropdown(dropdown => dropdown
-					.addOption('global', t('settings.region.global'))
-					.addOption('cn', t('settings.region.cn'))
-					.setValue(this.plugin.settings.region)
-					.onChange(async (value) => {
-						this.plugin.settings.region = value as 'global' | 'cn';
-						await this.plugin.saveSettings();
-						// Region changes the iframe URL — re-preload if enabled
-						if (this.plugin.settings.preloadViewer) {
-							this.plugin.schedulePreloadViewer();
-						}
-					}));
-
-			new Setting(containerEl)
-				.setName(t('settings.preloadViewer.name'))
-				.setDesc(t('settings.preloadViewer.desc'))
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.preloadViewer)
-					.onChange(async (value) => {
-						this.plugin.settings.preloadViewer = value;
-						await this.plugin.saveSettings();
-						if (value) {
-							this.plugin.schedulePreloadViewer();
-						} else {
-							this.plugin.clearPreload();
-						}
-					}));
-		}
-
-		new Setting(containerEl)
-			.setName(t('settings.viewerHeight.name'))
-			.setDesc(t('settings.viewerHeight.desc'))
-			.addText(text => text
-				.setPlaceholder(t('settings.viewerHeight.placeholder'))
-				.setValue(this.plugin.settings.viewerHeight)
-				.onChange(async (value) => {
-					this.plugin.settings.viewerHeight = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName(t('settings.showToolbar.name'))
-			.setDesc(t('settings.showToolbar.desc'))
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.showToolbar)
-				.onChange(async (value) => {
-					this.plugin.settings.showToolbar = value;
-					await this.plugin.saveSettings();
-					this.display();
-				}));
-
-		if (this.plugin.settings.showToolbar) {
-			new Setting(containerEl)
-				.setName(t('settings.doubleClickOpen.name'))
-				.setDesc(t('settings.doubleClickOpen.desc'))
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.doubleClickOpen)
-					.onChange(async (value) => {
-						this.plugin.settings.doubleClickOpen = value;
-						await this.plugin.saveSettings();
-					}));
+		switch (key) {
+			case 'language':
+				this.plugin.applyLocale();
+				// Rebuild all definitions so t() calls re-evaluate in the new locale.
+				this.update();
+				break;
+			case 'renderMode':
+				// Toggle region/preloadViewer visibility without full re-render.
+				this.refreshDomState();
+				break;
+			case 'region':
+				// Region change invalidates the preload iframe URL.
+				if (this.plugin.settings.preloadViewer) {
+					this.plugin.schedulePreloadViewer();
+				}
+				break;
+			case 'preloadViewer':
+				if (value) {
+					this.plugin.schedulePreloadViewer();
+				} else {
+					this.plugin.clearPreload();
+				}
+				break;
+			case 'showToolbar':
+				// Toggle doubleClickOpen visibility without full re-render.
+				this.refreshDomState();
+				break;
 		}
 	}
 }
