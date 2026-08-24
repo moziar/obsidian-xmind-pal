@@ -109,11 +109,9 @@ export async function processXMindBlock(
 		//
 		// The toolbar gets a refresh button that force re-reads the file from
 		// disk and re-renders.
-
-		let refreshBtn: HTMLElement | null = null;
-		const refresh = createThumbnailRefresh(plugin, file, viewerEl, setCleanup, () => refreshBtn);
+		const refresh = createThumbnailRefresh(plugin, file, viewerEl, setCleanup);
 		if (plugin.settings.showToolbar) {
-			refreshBtn = createToolbar(plugin, container, file, viewerEl, refresh);
+			createToolbar(plugin, container, file, viewerEl, refresh);
 		}
 
 		setCleanup(() => renderThumbnail(viewerEl, file, fileData, plugin, { viewerHeight: plugin.settings.viewerHeight, fileName: file.name }));
@@ -161,17 +159,17 @@ function extractFileLink(text: string): string | null {
  * Create the toolbar above the viewer: file name on the left, action
  * buttons on the right.
  *
- * Returns the refresh button when one was created (thumbnail mode with
- * toolbar enabled), or null otherwise — the caller hands it to the
- * refresh handler so it can stop the spin animation when done.
+ * `refresh` (thumbnail mode only) wires the refresh button; it receives
+ * the button element so it can drive the spin animation while the
+ * debounced refresh is in flight.
  */
 function createToolbar(
 	plugin: XMindViewerPlugin,
 	container: HTMLElement,
 	file: TFile,
 	viewerEl: HTMLElement,
-	refresh?: () => void
-): HTMLElement | null {
+	refresh?: (btn: HTMLElement) => void
+): void {
 	const toolbar = container.createDiv({ cls: 'xmind-viewer-toolbar' });
 	container.insertBefore(toolbar, viewerEl);
 
@@ -182,19 +180,11 @@ function createToolbar(
 	// Refresh button (thumbnail mode only): force re-reads the file from
 	// disk and re-renders. Created before the open button so it sits to
 	// its left.
-	let refreshBtn: HTMLElement | null = null;
 	if (refresh) {
 		const btn = toolbar.createDiv({ cls: 'xmind-viewer-open-btn' });
 		btn.title = t('ui.refreshThumbnail');
 		setIcon(btn, 'refresh-cw');
-		btn.addEventListener('click', () => {
-			// Spin immediately so there is feedback during the 500ms
-			// debounce window; the handler stops it when the refresh
-			// finishes. Idempotent across rapid repeated clicks.
-			btn.addClass('xmind-viewer-refreshing');
-			refresh();
-		});
-		refreshBtn = btn;
+		btn.addEventListener('click', () => refresh(btn));
 	}
 
 	const openBtn = toolbar.createDiv({ cls: 'xmind-viewer-open-btn' });
@@ -214,31 +204,34 @@ function createToolbar(
 			openWithDefaultApp(plugin, file);
 		});
 	}
-
-	return refreshBtn;
 }
 
 /**
- * Build the debounced refresh handler for the thumbnail toolbar button.
+ * Build the click handler for the thumbnail toolbar's refresh button.
  *
  * Flow per click (after the debounce window):
  *   1. Force re-read the .xmind file from disk, bypassing the file cache —
  *      this picks up edits Obsidian's vault events may not have detected.
  *   2. Drop the cached thumbnail so renderThumbnail takes the slow path
  *      with the fresh file data, then re-render.
+ *
+ * The button spins from the click until the debounced refresh settles —
+ * covering the 500ms debounce window — so the user always has feedback.
+ * The button element is captured at click time (the toolbar outlives
+ * thumbnail re-renders, which only replace the viewer content).
  */
 function createThumbnailRefresh(
 	plugin: XMindViewerPlugin,
 	file: TFile,
 	viewerEl: HTMLElement,
-	setCleanup: (makeCleanup: () => (() => void)) => void,
-	getRefreshBtn: () => HTMLElement | null
-): () => void {
-	return debounce(async () => {
+	setCleanup: (makeCleanup: () => (() => void)) => void
+): (btn: HTMLElement) => void {
+	let spinningBtn: HTMLElement | null = null;
+	const run = debounce(async () => {
 		// The code block may have been unloaded while the debounce was
 		// pending — don't resurrect a dead DOM subtree.
 		if (!viewerEl.isConnected) {
-			getRefreshBtn()?.removeClass('xmind-viewer-refreshing');
+			spinningBtn?.removeClass('xmind-viewer-refreshing');
 			return;
 		}
 		try {
@@ -258,9 +251,15 @@ function createThumbnailRefresh(
 			console.error('xmind-pal: thumbnail refresh failed', e);
 			new Notice(t('error.refreshFailed', { message: e instanceof Error ? e.message : String(e) }));
 		} finally {
-			getRefreshBtn()?.removeClass('xmind-viewer-refreshing');
+			spinningBtn?.removeClass('xmind-viewer-refreshing');
 		}
 	}, 500);
+
+	return (btn: HTMLElement) => {
+		spinningBtn = btn;
+		btn.addClass('xmind-viewer-refreshing');
+		run();
+	};
 }
 
 /** Minimal interface for the undocumented `app.openWithDefaultApp` API. */
