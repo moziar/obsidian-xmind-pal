@@ -1,4 +1,4 @@
-import { App, MarkdownPostProcessorContext, MarkdownRenderChild, TFile, debounce, setIcon } from 'obsidian';
+import { App, MarkdownPostProcessorContext, MarkdownRenderChild, Notice, TFile, debounce, setIcon } from 'obsidian';
 import XMindViewerPlugin from './main';
 import { renderOnline } from './xmind-online';
 import { renderThumbnail } from './xmind-thumbnail';
@@ -234,7 +234,7 @@ function createThumbnailRefresh(
 	setCleanup: (makeCleanup: () => (() => void)) => void,
 	getRefreshBtn: () => HTMLElement | null
 ): () => void {
-	return debounce(500, async () => {
+	return debounce(async () => {
 		// The code block may have been unloaded while the debounce was
 		// pending — don't resurrect a dead DOM subtree.
 		if (!viewerEl.isConnected) {
@@ -250,12 +250,17 @@ function createThumbnailRefresh(
 			}));
 		} catch (e) {
 			// Refresh failed (e.g. unreadable zip mid-write) — keep the
-			// current view rather than replacing it with an error.
+			// current view rather than replacing it with an error, but
+			// tell the user via a transient Notice. The console error
+			// keeps the full stack for debugging; console messages stay
+			// untranslated (developer-facing) while the Notice is i18n'd
+			// (user-facing).
 			console.error('xmind-pal: thumbnail refresh failed', e);
+			new Notice(t('error.refreshFailed', { message: e instanceof Error ? e.message : String(e) }));
 		} finally {
 			getRefreshBtn()?.removeClass('xmind-viewer-refreshing');
 		}
-	});
+	}, 500);
 }
 
 /** Minimal interface for the undocumented `app.openWithDefaultApp` API. */

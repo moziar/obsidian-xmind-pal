@@ -45,6 +45,7 @@ export default {
 	'error.notXmindFile': "File '{name}' is not a .xmind file.",
 	'error.parseFailed': 'Failed to parse xmind file: {message}',
 	'error.thumbnailFailed': 'Failed to load thumbnail: {message}',
+	'error.refreshFailed': 'Failed to refresh thumbnail: {message}',
 
 	// UI
 	'ui.openWithDefaultApp': 'Open with default app',

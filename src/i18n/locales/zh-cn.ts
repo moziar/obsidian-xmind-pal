@@ -45,6 +45,7 @@ export default {
 	'error.notXmindFile': "文件 '{name}' 不是 .xmind 文件。",
 	'error.parseFailed': '解析 xmind 文件失败：{message}',
 	'error.thumbnailFailed': '加载缩略图失败：{message}',
+	'error.refreshFailed': '刷新缩略图失败：{message}',
 
 	// UI
 	'ui.openWithDefaultApp': '使用默认应用打开',
