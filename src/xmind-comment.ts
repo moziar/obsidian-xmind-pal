@@ -77,8 +77,9 @@ export function registerXMindComment(plugin: XMindViewerPlugin): void {
 
 			child.onload = () => {
 				cancelled = false;
-				processXMindBlock(plugin, content, container, ctx, (fn) => {
-					cleanup = fn;
+				processXMindBlock(plugin, content, container, ctx, (makeCleanup) => {
+					cleanup?.();
+					cleanup = makeCleanup();
 				}).then(() => {
 					// If unloaded while processing, immediately clean up
 					// to avoid leaking resources in a detached container.

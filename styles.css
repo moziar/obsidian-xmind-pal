@@ -53,6 +53,21 @@
 	color: var(--text-normal);
 }
 
+/* Refresh button: rotate the icon while a refresh is in flight.
+   The animation targets the svg (not the button) so it never interferes
+   with the button's own hover transition, and runs on the compositor
+   thread so it stays smooth even while the main thread is busy with
+   canvas rendering. Reuses the loading spinner's keyframes. */
+.xmind-viewer-open-btn.xmind-viewer-refreshing svg {
+	animation: xmind-viewer-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.xmind-viewer-open-btn.xmind-viewer-refreshing svg {
+		animation: none;
+	}
+}
+
 .xmind-viewer-content {
 	width: 100%;
 }

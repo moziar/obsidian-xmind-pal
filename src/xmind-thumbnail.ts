@@ -23,7 +23,7 @@ const THUMBNAIL_PATH_SET = new Set(THUMBNAIL_PATHS);
  * The async `unzip` variant is used (not `unzipSync`) so decompression runs
  * in a Web Worker and never blocks the main thread.
  */
-function extractThumbnail(fileData: ArrayBuffer): Promise<Uint8Array> {
+export function extractThumbnail(fileData: ArrayBuffer): Promise<Uint8Array> {
 	const compressed = new Uint8Array(fileData);
 	return new Promise<Unzipped>((resolve, reject) => {
 		unzip(compressed, { filter: (file) => THUMBNAIL_PATH_SET.has(file.name) }, (err, files) => {

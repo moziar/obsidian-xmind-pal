@@ -204,10 +204,20 @@ export default class XMindViewerPlugin extends Plugin {
 		this.clearPreload();
 	}
 
-	async readXmindFile(file: TFile): Promise<ArrayBuffer> {
-		const cached = this.fileCache.get(file.path);
-		if (cached && cached.mtime === file.stat.mtime) {
-			return cached.data;
+	/**
+	 * Read an .xmind file as ArrayBuffer (cached).
+	 *
+	 * `force` bypasses the cache and re-reads from disk — used by the
+	 * toolbar refresh button, which must pick up external edits (e.g. the
+	 * file was re-saved by the XMind app) that Obsidian's vault events
+	 * may not have detected yet.
+	 */
+	async readXmindFile(file: TFile, force = false): Promise<ArrayBuffer> {
+		if (!force) {
+			const cached = this.fileCache.get(file.path);
+			if (cached && cached.mtime === file.stat.mtime) {
+				return cached.data;
+			}
 		}
 
 		const data = await this.app.vault.readBinary(file);
@@ -272,9 +282,10 @@ export default class XMindViewerPlugin extends Plugin {
 
 	/**
 	 * Drop a cached thumbnail — used when the underlying file changes,
-	 * is deleted, or is renamed.
+	 * is deleted, is renamed, or when the refresh button forces a
+	 * slow-path re-render.
 	 */
-	private invalidateThumbnail(path: string): void {
+	invalidateThumbnail(path: string): void {
 		this.thumbnailCache.delete(path);
 	}
 }

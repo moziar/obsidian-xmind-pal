@@ -1,4 +1,4 @@
-import { App, MarkdownPostProcessorContext, MarkdownRenderChild, TFile, setIcon } from 'obsidian';
+import { App, MarkdownPostProcessorContext, MarkdownRenderChild, TFile, debounce, setIcon } from 'obsidian';
 import XMindViewerPlugin from './main';
 import { renderOnline } from './xmind-online';
 import { renderThumbnail } from './xmind-thumbnail';
@@ -17,8 +17,9 @@ export function registerXMindCodeBlock(plugin: XMindViewerPlugin): void {
 		ctx.addChild(child);
 
 		try {
-			await processXMindBlock(plugin, source, container, ctx, (fn) => {
-				cleanup = fn;
+			await processXMindBlock(plugin, source, container, ctx, (makeCleanup) => {
+				cleanup?.();
+				cleanup = makeCleanup();
 			});
 		} catch (e) {
 			showError(container, t('error.renderFailed', { message: e instanceof Error ? e.message : String(e) }));
@@ -31,7 +32,7 @@ export async function processXMindBlock(
 	source: string,
 	container: HTMLElement,
 	ctx: MarkdownPostProcessorContext,
-	setCleanup: (fn: () => void) => void
+	setCleanup: (makeCleanup: () => (() => void)) => void
 ): Promise<void> {
 	const content = source.trim();
 	const sourcePath = ctx.sourcePath;
@@ -88,24 +89,34 @@ export async function processXMindBlock(
 	// Create toolbar if enabled
 	const viewerEl = container.createDiv({ cls: 'xmind-viewer-content' });
 
-	if (plugin.settings.showToolbar) {
-		createToolbar(plugin, container, file, viewerEl);
-	}
-
 	// Render
 	if (plugin.settings.renderMode === 'online') {
+		if (plugin.settings.showToolbar) {
+			createToolbar(plugin, container, file, viewerEl);
+		}
+
 		// Online mode: create a fixed-height wrapper so the loading overlay and iframe share the same box.
 		const wrapper = viewerEl.createDiv({ cls: 'xmind-viewer-online-wrapper' });
 		wrapper.style.height = plugin.settings.viewerHeight;
 
 		const loadingEl = createLoadingPlaceholder();
 		wrapper.appendChild(loadingEl);
-		setCleanup(renderOnline(wrapper, fileData, plugin.settings, loadingEl));
+		setCleanup(() => renderOnline(wrapper, fileData, plugin.settings, loadingEl));
 	} else {
 		// Thumbnail mode (default): render the XMind-generated preview image.
 		// Faster than iframe, fully native XMind fidelity, and supports Obsidian's
 		// built-in image Lightbox for zooming.
-		setCleanup(renderThumbnail(viewerEl, file, fileData, plugin, { viewerHeight: plugin.settings.viewerHeight, fileName: file.name }));
+		//
+		// The toolbar gets a refresh button that force re-reads the file from
+		// disk and re-renders.
+
+		let refreshBtn: HTMLElement | null = null;
+		const refresh = createThumbnailRefresh(plugin, file, viewerEl, setCleanup, () => refreshBtn);
+		if (plugin.settings.showToolbar) {
+			refreshBtn = createToolbar(plugin, container, file, viewerEl, refresh);
+		}
+
+		setCleanup(() => renderThumbnail(viewerEl, file, fileData, plugin, { viewerHeight: plugin.settings.viewerHeight, fileName: file.name }));
 	}
 }
 
@@ -146,18 +157,45 @@ function extractFileLink(text: string): string | null {
 	return null;
 }
 
+/**
+ * Create the toolbar above the viewer: file name on the left, action
+ * buttons on the right.
+ *
+ * Returns the refresh button when one was created (thumbnail mode with
+ * toolbar enabled), or null otherwise — the caller hands it to the
+ * refresh handler so it can stop the spin animation when done.
+ */
 function createToolbar(
 	plugin: XMindViewerPlugin,
 	container: HTMLElement,
 	file: TFile,
-	viewerEl: HTMLElement
-): void {
+	viewerEl: HTMLElement,
+	refresh?: () => void
+): HTMLElement | null {
 	const toolbar = container.createDiv({ cls: 'xmind-viewer-toolbar' });
 	container.insertBefore(toolbar, viewerEl);
 
 	const filenameEl = toolbar.createDiv({ cls: 'xmind-viewer-filename' });
 	filenameEl.textContent = file.name;
 	filenameEl.title = file.path;
+
+	// Refresh button (thumbnail mode only): force re-reads the file from
+	// disk and re-renders. Created before the open button so it sits to
+	// its left.
+	let refreshBtn: HTMLElement | null = null;
+	if (refresh) {
+		const btn = toolbar.createDiv({ cls: 'xmind-viewer-open-btn' });
+		btn.title = t('ui.refreshThumbnail');
+		setIcon(btn, 'refresh-cw');
+		btn.addEventListener('click', () => {
+			// Spin immediately so there is feedback during the 500ms
+			// debounce window; the handler stops it when the refresh
+			// finishes. Idempotent across rapid repeated clicks.
+			btn.addClass('xmind-viewer-refreshing');
+			refresh();
+		});
+		refreshBtn = btn;
+	}
 
 	const openBtn = toolbar.createDiv({ cls: 'xmind-viewer-open-btn' });
 	openBtn.title = t('ui.openWithDefaultApp');
@@ -167,10 +205,57 @@ function createToolbar(
 	});
 
 	if (plugin.settings.doubleClickOpen) {
-		toolbar.addEventListener('dblclick', () => {
+		toolbar.addEventListener('dblclick', (e) => {
+			// The dblclick-to-open gesture targets the toolbar's empty
+			// space (filename area). Double-clicking a toolbar button —
+			// e.g. rapidly clicking refresh — must not also launch the
+			// external app; buttons own their click semantics.
+			if ((e.target as HTMLElement).closest('.xmind-viewer-open-btn')) return;
 			openWithDefaultApp(plugin, file);
 		});
 	}
+
+	return refreshBtn;
+}
+
+/**
+ * Build the debounced refresh handler for the thumbnail toolbar button.
+ *
+ * Flow per click (after the debounce window):
+ *   1. Force re-read the .xmind file from disk, bypassing the file cache —
+ *      this picks up edits Obsidian's vault events may not have detected.
+ *   2. Drop the cached thumbnail so renderThumbnail takes the slow path
+ *      with the fresh file data, then re-render.
+ */
+function createThumbnailRefresh(
+	plugin: XMindViewerPlugin,
+	file: TFile,
+	viewerEl: HTMLElement,
+	setCleanup: (makeCleanup: () => (() => void)) => void,
+	getRefreshBtn: () => HTMLElement | null
+): () => void {
+	return debounce(500, async () => {
+		// The code block may have been unloaded while the debounce was
+		// pending — don't resurrect a dead DOM subtree.
+		if (!viewerEl.isConnected) {
+			getRefreshBtn()?.removeClass('xmind-viewer-refreshing');
+			return;
+		}
+		try {
+			const freshData = await plugin.readXmindFile(file, true);
+			plugin.invalidateThumbnail(file.path);
+			setCleanup(() => renderThumbnail(viewerEl, file, freshData, plugin, {
+				viewerHeight: plugin.settings.viewerHeight,
+				fileName: file.name,
+			}));
+		} catch (e) {
+			// Refresh failed (e.g. unreadable zip mid-write) — keep the
+			// current view rather than replacing it with an error.
+			console.error('xmind-pal: thumbnail refresh failed', e);
+		} finally {
+			getRefreshBtn()?.removeClass('xmind-viewer-refreshing');
+		}
+	});
 }
 
 /** Minimal interface for the undocumented `app.openWithDefaultApp` API. */
