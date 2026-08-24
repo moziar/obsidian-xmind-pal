@@ -228,13 +228,10 @@ function createThumbnailRefresh(
 ): (btn: HTMLElement) => void {
 	let spinningBtn: HTMLElement | null = null;
 	const run = debounce(async () => {
-		// The code block may have been unloaded while the debounce was
-		// pending — don't resurrect a dead DOM subtree.
-		if (!viewerEl.isConnected) {
-			spinningBtn?.removeClass('xmind-viewer-refreshing');
-			return;
-		}
 		try {
+			// The code block may have been unloaded while the debounce was
+			// pending — don't resurrect a dead DOM subtree.
+			if (!viewerEl.isConnected) return;
 			const freshData = await plugin.readXmindFile(file, true);
 			plugin.invalidateThumbnail(file.path);
 			setCleanup(() => renderThumbnail(viewerEl, file, freshData, plugin, {
