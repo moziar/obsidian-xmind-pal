@@ -46,6 +46,7 @@
 	cursor: pointer;
 	color: var(--text-muted);
 	transition: background-color 0.15s ease, color 0.15s ease;
+	user-select: none;
 }
 
 .xmind-viewer-open-btn:hover {
